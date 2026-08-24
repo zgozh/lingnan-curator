@@ -7,6 +7,8 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 直跑时补项目根
+
 from app.ingest.meta import find_image
 from app.ingest.vision_ops import colorize, restore_face
 

@@ -33,11 +33,12 @@ def _repo(kind: str) -> Path:
 
 
 def _build_cmd(kind: str, src: Path, dst: Path) -> list[str]:
-    """构造 vendor 推理命令；dst 仅用于推导临时输出/输入目录。"""
+    """构造 vendor 推理命令。所有路径必须绝对（子进程 cwd 在 vendor 仓库）。"""
     py = _venv_python(kind)
     if py is None:
         raise FileNotFoundError(f"vendor venv 缺失: kind={kind}")
-    out_dir = dst.parent / f".vendor-{kind}"
+    src = Path(src).resolve()
+    out_dir = (dst.parent / f".vendor-{kind}").resolve()
     if kind == "cf":
         repo = _repo("cf")
         return [
@@ -45,7 +46,7 @@ def _build_cmd(kind: str, src: Path, dst: Path) -> list[str]:
             "-w", "0.7", "-i", str(src), "-o", str(out_dir),
             "--face_upsample",
         ]
-    in_dir = dst.parent / ".vendor-dd-in"
+    in_dir = (dst.parent / ".vendor-dd-in").resolve()
     return [
         py, str(_DD_REPO / "scripts" / "infer.py"),
         "--model_name", "ddcolor_modelscope",
@@ -84,7 +85,7 @@ def _run_kind(kind: str, src: Path, dst: Path) -> bool:
     tmp_out = dst.parent / f".vendor-{kind}"
     try:
         if kind == "dd":  # infer.py 是目录进：把单张图放进临时输入目录
-            in_dir = dst.parent / ".vendor-dd-in"
+            in_dir = (dst.parent / ".vendor-dd-in").resolve()
             in_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, in_dir / Path(src).name)
         proc = subprocess.run(
@@ -106,6 +107,7 @@ def _run_kind(kind: str, src: Path, dst: Path) -> bool:
         return False
     finally:
         shutil.rmtree(tmp_out, ignore_errors=True)
+        shutil.rmtree(dst.parent / ".vendor-dd-in", ignore_errors=True)
 
 
 def restore_face(src: Path, dst: Path) -> bool:
