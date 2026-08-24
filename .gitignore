@@ -1,0 +1,27 @@
+# 密钥与环境
+.env
+
+# 数据与衍生资产（素材不入 git，版权与体积原因）
+data/raw/
+data/processed/
+data/tmp/
+
+# 模型权重
+models/
+*.ckpt
+*.safetensors
+*.pth
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# 评测产物（报告保留 JSON 结论时可手动放开）
+eval/reports/
+
+# 系统
+Thumbs.db
+.DS_Store
