@@ -73,7 +73,7 @@ def test_to_normalized_list_unwraps_model_output():
         image_embeds = torch.tensor([[3.0, 4.0]])
 
     out = emb._to_normalized_list(FakeOutput())
-    assert out == [0.6, 0.8]
+    assert out == pytest.approx([0.6, 0.8])
 
 
 def test_free_allows_reload(fake_loaders):
