@@ -18,6 +18,9 @@ __pycache__/
 .venv/
 .uv-cache/
 .pytest_cache/
+.pytest-tmp/
+.tmp/
+data/test-runs/
 .ruff_cache/
 
 # 评测产物（报告保留 JSON 结论时可手动放开）
