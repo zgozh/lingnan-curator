@@ -11,11 +11,19 @@ def test_build_cmd_restore_uses_cf_venv_and_script():
     assert any("inference_codeformer" in c for c in cmd)
 
 
-def test_build_cmd_colorize_uses_dd_infer_script_with_model_name():
+def test_build_cmd_colorize_falls_back_to_hf_when_no_local_weights(monkeypatch):
+    """本地权重缺失时回退 HF model_name 分支（与真实环境解耦）。"""
+    real_exists = Path.exists
+
+    def fake_exists(self: Path):
+        if self.name == "pytorch_model.pt" and "pretrain" in str(self):
+            return False
+        return real_exists(self)
+
+    monkeypatch.setattr(Path, "exists", fake_exists)
     cmd = vo._build_cmd("dd", Path("in.jpg"), Path("data/processed/a/colorized.jpg"))
-    assert "venv-dd" in cmd[0]
-    assert any(c.endswith("infer.py") for c in cmd)
     assert "--model_name" in cmd and "ddcolor_modelscope" in cmd
+    assert "--model_path" not in cmd
 
 
 def test_build_cmd_colorize_prefers_local_weights(monkeypatch):
