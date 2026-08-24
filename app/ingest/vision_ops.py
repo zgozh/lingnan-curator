@@ -2,8 +2,14 @@
 
 独立 venv + 子进程隔离（ADR-0002）；任何失败返回 False，由上层按
 DEGRADED 降级（spec 边界案例），绝不抛异常——降级铁律。
+
+spike 结论（2026-08-24）：
+- PyPI basicsr sdist 在沙箱内构建被拒 → CF 子进程以 PYTHONPATH 借用
+  DDColor 仓库内置的 basicsr（导入已实测可用），不再 pip 安装。
+- DDColor 推理入口为 scripts/infer.py，目录进/出，权重经 hf-mirror 自动下载。
 """
 import logging
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -11,6 +17,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 _VENDOR = Path(__file__).resolve().parents[2] / "models" / "vendor"
+_DD_REPO = _VENDOR / "DDColor"
 TIMEOUT = 300  # 单张/vendor 调用上限（秒）
 _IMG_EXTS = (".png", ".jpg", ".jpeg", ".webp")
 
@@ -21,22 +28,28 @@ def _venv_python(kind: str) -> str | None:
     return str(p) if p.exists() else None
 
 
+def _repo(kind: str) -> Path:
+    return _VENDOR / ("CodeFormer" if kind == "cf" else "DDColor")
+
+
 def _build_cmd(kind: str, src: Path, dst: Path) -> list[str]:
-    """构造 vendor 推理命令；dst 仅用于推导临时输出目录。"""
+    """构造 vendor 推理命令；dst 仅用于推导临时输出/输入目录。"""
     py = _venv_python(kind)
     if py is None:
         raise FileNotFoundError(f"vendor venv 缺失: kind={kind}")
-    repo = _VENDOR / ("CodeFormer" if kind == "cf" else "DDColor")
     out_dir = dst.parent / f".vendor-{kind}"
     if kind == "cf":
+        repo = _repo("cf")
         return [
             py, str(repo / "inference_codeformer.py"),
             "-w", "0.7", "-i", str(src), "-o", str(out_dir),
             "--face_upsample",
         ]
+    in_dir = dst.parent / ".vendor-dd-in"
     return [
-        py, str(repo / "scripts" / "inference_ddcolor.py"),
-        "-i", str(src), "-o", str(out_dir),
+        py, str(_DD_REPO / "scripts" / "infer.py"),
+        "--model_name", "ddcolor_modelscope",
+        "--input", str(in_dir), "--output", str(out_dir),
     ]
 
 
@@ -52,17 +65,27 @@ def _harvest(vendor_out: Path, dst: Path) -> bool:
 
 
 def _run_kind(kind: str, src: Path, dst: Path) -> bool:
+    src, dst = Path(src), Path(dst)
     try:
         cmd = _build_cmd(kind, src, dst)
     except FileNotFoundError as exc:
         logger.warning("%s vendor 未就绪，按降级处理: %s", kind, exc)
         return False
 
-    repo = _VENDOR / ("CodeFormer" if kind == "cf" else "DDColor")
+    env = dict(os.environ)
+    env.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+    # spike 结论：借用 DDColor 内置 basicsr，绕开 PyPI sdist 沙箱构建失败
+    env["PYTHONPATH"] = str(_DD_REPO)
+
     tmp_out = dst.parent / f".vendor-{kind}"
     try:
+        if kind == "dd":  # infer.py 是目录进：把单张图放进临时输入目录
+            in_dir = dst.parent / ".vendor-dd-in"
+            in_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, in_dir / Path(src).name)
         proc = subprocess.run(
-            cmd, cwd=str(repo), capture_output=True, timeout=TIMEOUT,
+            cmd, cwd=str(_repo(kind)), env=env, capture_output=True,
+            timeout=TIMEOUT,
         )
         if proc.returncode != 0:
             logger.warning(

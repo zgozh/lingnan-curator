@@ -11,10 +11,27 @@ def test_build_cmd_restore_uses_cf_venv_and_script():
     assert any("inference_codeformer" in c for c in cmd)
 
 
-def test_build_cmd_colorize_uses_dd_venv_and_script():
+def test_build_cmd_colorize_uses_dd_infer_script_with_model_name():
     cmd = vo._build_cmd("dd", Path("in.jpg"), Path("data/processed/a/colorized.jpg"))
     assert "venv-dd" in cmd[0]
-    assert any("inference_ddcolor" in c for c in cmd)
+    assert any(c.endswith("infer.py") for c in cmd)
+    assert "--model_name" in cmd and "ddcolor_modelscope" in cmd
+
+
+def test_run_env_carries_hf_mirror_and_borrowed_basicsr(monkeypatch, tmp_path):
+    """spike 结论落地：子进程必须带 HF_ENDPOINT 与指向 DDColor 的 PYTHONPATH。"""
+    seen = {}
+
+    def fake_run(cmd, **kw):
+        seen.update(kw)
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(vo.subprocess, "run", fake_run)
+    monkeypatch.setattr(vo, "_harvest", lambda o, d: True)
+    ok = vo.colorize(tmp_path / "in.jpg", tmp_path / "c.jpg")
+    assert ok is True
+    assert seen["env"]["HF_ENDPOINT"] == "https://hf-mirror.com"
+    assert "DDColor" in seen["env"]["PYTHONPATH"]
 
 
 def test_harvest_moves_largest_image(tmp_path):
