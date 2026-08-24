@@ -1,7 +1,21 @@
 # PROGRESS —— lingnan-curator
 
 ## 当前阶段
-**阶段 3（拆任务）完成**：W1 实现计划已落盘 `docs/superpowers/plans/2026-08-24-w1-ingest-pipeline.md`（10 个任务，TDD 步进）。等待用户选定执行方式后进入阶段 4。
+**阶段 4 实现中（W1）**：Task 1~6 完成（TDD 全绿 32 tests）。剩 T7 vendor spike、T8 pipeline+CLI、T9 README、T10 e2e 冒烟（需用户放 3 张真实样张进 `data/raw/`）。
+
+## W1 执行记录
+- [2026-08-24] Task1 ✅ ec80256 骨架+Settings+PhotoRecord/IngestReport
+- [2026-08-24] Task2 ✅ 24e00cf Milvus compose(单容器)+存储层先删后插幂等；license/source_url 入 schema（测试驱出的补充）
+- [2026-08-24] Task3 ✅ e5c32c2 meta.csv 版权校验器；自写 tmp_path fixture
+- [2026-08-24] Task4 ✅ fded549 OCR 节点（RapidOCR 惰性单例，降级返回空串）
+- [2026-08-24] Task5 ✅ c89dbbb DashScopeVLM 客户端+caption JSON 防御清洗+降级拼接
+- [2026-08-24] Task6 ✅ 5dfd138 Embedder 双塔单例(BGE-M3+Chinese-CLIP)+free() 显存纪律；torch 2.13.0+cpu / transformers / FlagEmbedding 已入库
+
+### 沙箱环境适配（重要，后续会话必读）
+- uv 缓存重定向：每次调 uv 前设 `$env:UV_CACHE_DIR='<workspace>\.uv-cache'`（系统缓存目录被沙箱拒）
+- pytest 禁用 cacheprovider；**内置 tmp_path/basetemp 的"整树删建"会触发沙箱拒绝并留下 ACL 损坏目录**——已用 `tests/conftest.py` 自写 tmp_path（data/test-runs/ 下唯一目录）替代，勿改回
+- 根目录 `pytest-cache-files-*` 与 `.pytest-tmp` 为损坏垃圾目录（无法删除），已被 testpaths=tests 无害化，可手动删
+- torch 当前为 CPU 版；Task10 e2e 前切 cu121：pyproject 加 `[[tool.uv.index]] name="pytorch-cu121" url="https://download.pytorch.org/whl/cu121" explicit=true` + `[tool.uv.sources] torch={index="pytorch-cu121"}` 后 `uv sync`
 
 ## 已完成
 - [2026-08-24] （上一会话）参赛方案拍板：「湾区记忆·岭南非遗 AI 策展人」；创建目录并 git init
