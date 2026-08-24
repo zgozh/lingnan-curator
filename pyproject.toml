@@ -17,5 +17,6 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+testpaths = ["tests"]
 addopts = "-p no:cacheprovider"
 markers = ["e2e: 真实链路集成测试(需外部服务)"]
