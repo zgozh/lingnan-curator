@@ -74,6 +74,10 @@ def _run_kind(kind: str, src: Path, dst: Path) -> bool:
 
     env = dict(os.environ)
     env.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+    # HF 缓存重定向进工作区（沙箱拒写 AppData）
+    env.setdefault(
+        "HF_HOME", str(_VENDOR.parent.parent / "models" / "hf-cache")
+    )
     # spike 结论：借用 DDColor 内置 basicsr，绕开 PyPI sdist 沙箱构建失败
     env["PYTHONPATH"] = str(_DD_REPO)
 
