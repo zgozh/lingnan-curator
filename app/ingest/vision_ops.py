@@ -47,6 +47,14 @@ def _build_cmd(kind: str, src: Path, dst: Path) -> list[str]:
             "--face_upsample",
         ]
     in_dir = (dst.parent / ".vendor-dd-in").resolve()
+    local_weights = _DD_REPO / "pretrain" / "pytorch_model.pt"
+    if local_weights.exists():
+        # spike 结论：huggingface_hub 1.28 与镜像元数据校验不兼容，本地权重优先
+        return [
+            py, str(_DD_REPO / "scripts" / "infer.py"),
+            "--model_path", str(local_weights),
+            "--input", str(in_dir), "--output", str(out_dir),
+        ]
     return [
         py, str(_DD_REPO / "scripts" / "infer.py"),
         "--model_name", "ddcolor_modelscope",

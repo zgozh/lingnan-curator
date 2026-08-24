@@ -18,6 +18,20 @@ def test_build_cmd_colorize_uses_dd_infer_script_with_model_name():
     assert "--model_name" in cmd and "ddcolor_modelscope" in cmd
 
 
+def test_build_cmd_colorize_prefers_local_weights(monkeypatch):
+    """spike 结论：hub 1.28 与镜像元数据不兼容 → 本地权重优先。"""
+    real_exists = Path.exists
+
+    def fake_exists(self: Path):
+        if self.name == "pytorch_model.pt" and "pretrain" in str(self):
+            return True
+        return real_exists(self)
+
+    monkeypatch.setattr(Path, "exists", fake_exists)
+    cmd = vo._build_cmd("dd", Path("in.jpg"), Path("data/processed/a/colorized.jpg"))
+    assert "--model_path" in cmd and "--model_name" not in cmd
+
+
 def test_run_env_carries_hf_mirror_and_borrowed_basicsr(monkeypatch, tmp_path):
     """spike 结论落地：子进程必须带 HF_ENDPOINT 与指向 DDColor 的 PYTHONPATH。"""
     seen = {}
