@@ -28,7 +28,9 @@ def test_run_env_carries_hf_mirror_and_borrowed_basicsr(monkeypatch, tmp_path):
 
     monkeypatch.setattr(vo.subprocess, "run", fake_run)
     monkeypatch.setattr(vo, "_harvest", lambda o, d: True)
-    ok = vo.colorize(tmp_path / "in.jpg", tmp_path / "c.jpg")
+    img = tmp_path / "in.jpg"
+    img.write_bytes(b"x")
+    ok = vo.colorize(img, tmp_path / "c.jpg")
     assert ok is True
     assert seen["env"]["HF_ENDPOINT"] == "https://hf-mirror.com"
     assert "DDColor" in seen["env"]["PYTHONPATH"]
