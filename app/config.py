@@ -15,7 +15,7 @@ class Settings:
     llm_model: str = "qwen-plus"
     vlm_model: str = "qwen-vl-plus"
     bge_m3_model_path: str = "BAAI/bge-m3"
-    clip_model_path: str = "OFA-Sys/chinese-clip-vit-base-p16"
+    clip_model_path: str = "OFA-Sys/chinese-clip-vit-base-patch16"
 
     @staticmethod
     def load(env_file: str | None = ".env") -> "Settings":

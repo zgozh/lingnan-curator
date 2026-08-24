@@ -37,6 +37,9 @@ def _prep_image(processor, path) -> dict:
 
 
 def _to_normalized_list(feats) -> list[float]:
+    # transformers 5.x 的 get_image_features 可能返回 ModelOutput——解包取嵌入
+    if hasattr(feats, "image_embeds"):
+        feats = feats.image_embeds
     feats = feats / feats.norm(dim=-1, keepdim=True)
     return feats.squeeze(0).tolist()
 

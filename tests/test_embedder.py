@@ -65,6 +65,17 @@ def test_image_pipeline_wiring(fake_loaders, tmp_path):
     assert len(v) == 512
 
 
+def test_to_normalized_list_unwraps_model_output():
+    """transformers 5.x 的 get_image_features 可能返回 ModelOutput——须解包。"""
+    import torch
+
+    class FakeOutput:
+        image_embeds = torch.tensor([[3.0, 4.0]])
+
+    out = emb._to_normalized_list(FakeOutput())
+    assert out == [0.6, 0.8]
+
+
 def test_free_allows_reload(fake_loaders):
     e = Embedder()
     e.texts("x")
