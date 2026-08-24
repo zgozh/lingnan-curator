@@ -24,8 +24,10 @@ def test_ingest_runs_with_defaults(tmp_path, monkeypatch):
         )
 
     def fake_run(records, raw_dir, out_root, report_path):
+        from app.models import IngestReport
+
         seen["n"] = len(records)
-        return object()
+        return IngestReport()
 
     monkeypatch.setattr(meta_mod, "load_meta", fake_load)
     monkeypatch.setattr(cli, "_ingest_flow", fake_run)
