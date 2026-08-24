@@ -1,7 +1,7 @@
 # PROGRESS —— lingnan-curator
 
 ## 当前阶段
-**阶段 4 实现中（W1）**：Task 1~6 完成（TDD 全绿 32 tests）。剩 T7 vendor spike、T8 pipeline+CLI、T9 README、T10 e2e 冒烟（需用户放 3 张真实样张进 `data/raw/`）。
+**阶段 4 实现中（W1）**：Task 1~9 完成（TDD 全绿 50 tests），T7 vendor spike 实测双通（restore+colorize 真实出图）。剩 T10 e2e 冒烟——仅差 Milvus 启动（用户跑 `docker compose up -d milvus`）。
 
 ## W1 执行记录
 - [2026-08-24] Task1 ✅ ec80256 骨架+Settings+PhotoRecord/IngestReport
@@ -10,12 +10,23 @@
 - [2026-08-24] Task4 ✅ fded549 OCR 节点（RapidOCR 惰性单例，降级返回空串）
 - [2026-08-24] Task5 ✅ c89dbbb DashScopeVLM 客户端+caption JSON 防御清洗+降级拼接
 - [2026-08-24] Task6 ✅ 5dfd138 Embedder 双塔单例(BGE-M3+Chinese-CLIP)+free() 显存纪律；torch 2.13.0+cpu / transformers / FlagEmbedding 已入库
+- [2026-08-24] Task7 ✅ **vendor spike 全通**：CF restore=True(21s) + DDColor colorize=True(17s)，样张真实出图（见下方 spike 结论）
+- [2026-08-24] Task8 ✅ b48ed55/f75818e/050f599 pipeline 编排+CLI ingest 子命令；caption 无 key 构造失败也走降级
+- [2026-08-24] Task9 ✅ 9f45106 README 六步快速开始 + `.env` 骨架
+
+### T7 vendor spike 结论（重要，后续会话必读）
+- **CodeFormer**：用其仓库自带 vendored basicsr（缺 `basicsr/version.py`，已手补最小版）；venv-cf 需显式装 `lpips` 等。PyPI `basicsr` sdist 在沙箱内构建被拒 → 不 pip 安装 basicsr。
+- **DDColor**：推理入口是 `scripts/infer.py`（目录进/出）；huggingface_hub 1.28 与 hf-mirror 元数据校验不兼容（FileMetadataError）→ 改从 **ModelScope 直链**下载权重到 `models/vendor/DDColor/pretrain/pytorch_model.pt`，代码优先 `--model_path` 本地模式。
+- **权重清单**（均已就位）：CodeFormer release v0.1.0 的 codeformer.pth(377MB)/detection_Resnet50_Final(109MB,legacy pickle 格式非 zip)/parsing_parsenet(85MB)/RealESRGAN_x2plus(67MB)；GFPGANv1.4.pth(349MB) 来自 TencentARC release v1.3.0；DDColor 912MB 来自 ModelScope。
+- **下载不稳对策**：`scripts/fetch_resumable.py`（Range 断点续传循环重试）。注意：GitHub CDN 大文件常截断；facexlib/gfpgan 权重是 legacy pickle 格式，zipfile 体检会误报 BAD，以文件头 `\x80\x02` 判格式。
+- vision_ops 已固化：子进程 env 注入 `HF_ENDPOINT=hf-mirror`、`HF_HOME=models/hf-cache`、`PYTHONPATH=DDColor仓库`（借 basicsr）；所有传给 vendor 的路径强制 resolve() 绝对路径（子进程 cwd 在 vendor 目录内）。
 
 ### 沙箱环境适配（重要，后续会话必读）
 - uv 缓存重定向：每次调 uv 前设 `$env:UV_CACHE_DIR='<workspace>\.uv-cache'`（系统缓存目录被沙箱拒）
 - pytest 禁用 cacheprovider；**内置 tmp_path/basetemp 的"整树删建"会触发沙箱拒绝并留下 ACL 损坏目录**——已用 `tests/conftest.py` 自写 tmp_path（data/test-runs/ 下唯一目录）替代，勿改回
 - 根目录 `pytest-cache-files-*` 与 `.pytest-tmp` 为损坏垃圾目录（无法删除），已被 testpaths=tests 无害化，可手动删
 - torch 当前为 CPU 版；Task10 e2e 前切 cu121：pyproject 加 `[[tool.uv.index]] name="pytorch-cu121" url="https://download.pytorch.org/whl/cu121" explicit=true` + `[tool.uv.sources] torch={index="pytorch-cu121"}` 后 `uv sync`
+- docker CLI 被沙箱命名管道策略挡（提权被用户取消）→ Milvus 启动由用户在自己终端执行 `docker compose up -d milvus`；应用侧走 TCP 不受影响
 
 ## 已完成
 - [2026-08-24] （上一会话）参赛方案拍板：「湾区记忆·岭南非遗 AI 策展人」；创建目录并 git init
