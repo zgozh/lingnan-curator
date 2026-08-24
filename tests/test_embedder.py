@@ -72,8 +72,12 @@ def test_to_normalized_list_unwraps_model_output():
     class FakeOutput:
         image_embeds = torch.tensor([[3.0, 4.0]])
 
-    out = emb._to_normalized_list(FakeOutput())
-    assert out == pytest.approx([0.6, 0.8])
+    class FakeVisionOutput:
+        """transformers 5.x ChineseCLIP：投影结果塞在 pooler_output。"""
+        pooler_output = torch.tensor([[3.0, 4.0]])
+
+    assert emb._to_normalized_list(FakeOutput()) == pytest.approx([0.6, 0.8])
+    assert emb._to_normalized_list(FakeVisionOutput()) == pytest.approx([0.6, 0.8])
 
 
 def test_free_allows_reload(fake_loaders):

@@ -37,9 +37,12 @@ def _prep_image(processor, path) -> dict:
 
 
 def _to_normalized_list(feats) -> list[float]:
-    # transformers 5.x 的 get_image_features 可能返回 ModelOutput——解包取嵌入
+    # transformers 5.x：ChineseCLIP get_image_features 返回 vision ModelOutput，
+    # 投影后的嵌入在 pooler_output；旧版直接返回张量或带 image_embeds 的输出。
     if hasattr(feats, "image_embeds"):
         feats = feats.image_embeds
+    elif hasattr(feats, "pooler_output"):
+        feats = feats.pooler_output
     feats = feats / feats.norm(dim=-1, keepdim=True)
     return feats.squeeze(0).tolist()
 
