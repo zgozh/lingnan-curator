@@ -11,7 +11,7 @@ from app.models import PhotoRecord
 _VALID_EXT = (".jpg", ".jpeg", ".png")
 
 
-def _find_image(raw_dir: Path, photo_id: str) -> Path | None:
+def find_image(raw_dir: Path, photo_id: str) -> Path | None:
     for ext in _VALID_EXT:
         p = raw_dir / f"{photo_id}{ext}"
         if p.exists():
@@ -47,7 +47,7 @@ def load_meta(csv_path: Path, raw_dir: Path) -> tuple[list[PhotoRecord], list[st
             if pid in seen:
                 errors.append(f"{pid}: photo_id 重复")
                 continue
-            if _find_image(raw_dir, pid) is None:
+            if find_image(raw_dir, pid) is None:
                 errors.append(f"{pid}: raw 目录找不到 jpg/png/jpeg 文件")
                 continue
 

@@ -90,3 +90,22 @@ def upsert_photo(
 def count_photos(client: MilvusClient, collection: str = "lingnan_photos") -> int:
     res = client.query(collection_name=collection, output_fields=["count(*)"])
     return int(res[0]["count(*)"]) if res else 0
+
+
+_client: MilvusClient | None = None
+
+
+def get_client(settings=None) -> MilvusClient:
+    """进程级单例连接（昂贵资源）。测试可 monkeypatch 本函数。"""
+    global _client
+    if _client is None:
+        from app.config import Settings
+
+        s = settings or Settings.load()
+        _client = MilvusClient(uri=s.milvus_uri)
+    return _client
+
+
+def reset_client() -> None:
+    global _client
+    _client = None
