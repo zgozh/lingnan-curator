@@ -39,7 +39,19 @@ def _setup(tmp_path, monkeypatch, *, restore=True, colorize=True, ocr="招牌",
     calls = store_calls if store_calls is not None else []
     monkeypatch.setattr(pipe, "upsert_photo", lambda c, r, **kw: calls.append((r, kw)))
     monkeypatch.setattr(pipe, "get_client", lambda settings=None: object())
+    monkeypatch.setattr(pipe, "ensure_collection", lambda c, n: None)
     return raw, out, calls
+
+
+def test_ensures_collection_before_store(tmp_path, monkeypatch):
+    """入库前必须确保 collection 存在（幂等建表）。"""
+    raw, out, calls = _setup(tmp_path, monkeypatch)
+    seen = []
+    monkeypatch.setattr(pipe, "ensure_collection",
+                        lambda c, n: seen.append(n))
+    pipe.run_pipeline([_rec()], raw, out, out / "_report.json")
+    assert seen == ["lingnan_photos"]
+    assert len(calls) == 1
 
 
 def test_happy_path_all_ok(tmp_path, monkeypatch):

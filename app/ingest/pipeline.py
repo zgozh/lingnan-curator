@@ -9,7 +9,7 @@ from pathlib import Path
 
 from app.config import Settings
 from app.infra.embedder import Embedder
-from app.infra.milvus_store import get_client, upsert_photo
+from app.infra.milvus_store import ensure_collection, get_client, upsert_photo
 from app.ingest.caption_op import caption_photo
 from app.ingest.meta import find_image
 from app.ingest.ocr_op import run_ocr
@@ -40,6 +40,7 @@ def run_pipeline(
         started_at=datetime.now(timezone.utc).isoformat(timespec="seconds")
     )
     client = get_client(settings)
+    ensure_collection(client, settings.collection)  # 幂等建表
     emb = _get_embedder()
 
     try:
