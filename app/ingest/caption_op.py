@@ -44,11 +44,11 @@ def caption_photo(
     record: PhotoRecord,
     client: DashScopeVLM | None = None,
 ) -> Caption:
-    client = client or get_vlm()
     prompt = f"{CAPTION_SYSTEM}\n已知元数据：标题={record.title}；年代={record.year or '不详'}；地点={record.location or '不详'}"
     try:
+        client = client or get_vlm()
         raw = client.describe(image_path, prompt)
-    except Exception as exc:  # noqa: BLE001 —— 降级边界
+    except Exception as exc:  # noqa: BLE001 —— 降级边界（含无 key 构造失败）
         logger.warning("VLM 调用失败(%s)，降级拼接: %s", record.photo_id, exc)
         return fallback_caption(record)
 

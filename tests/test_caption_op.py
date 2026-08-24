@@ -63,6 +63,18 @@ def test_fallback_on_client_exception(tmp_path):
     assert cap.model == "fallback"
 
 
+def test_fallback_when_default_client_construction_fails(tmp_path, monkeypatch):
+    """无 key 环境：get_vlm() 构造抛异常也必须走降级，不许崩管线。"""
+    import app.ingest.caption_op as cap_mod
+
+    def boom(settings=None):
+        raise RuntimeError("api_key 未配置")
+
+    monkeypatch.setattr(cap_mod, "get_vlm", boom)
+    cap = caption_photo(_img(tmp_path), _rec())
+    assert cap.model == "fallback"
+
+
 def test_missing_description_key_is_fallback(tmp_path):
     cap = caption_photo(_img(tmp_path), _rec(), client=FakeClient('{"foo": 1}'))
     assert cap.model == "fallback"
