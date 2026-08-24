@@ -1,6 +1,6 @@
 services:
   milvus:
-    image: milvusdb/milvus:v2.4.17
+    image: milvusdb/milvus:v2.4.15
     command: ["milvus", "run", "standalone"]
     environment:
       ETCD_USE_EMBED: "true"
