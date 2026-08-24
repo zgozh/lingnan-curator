@@ -1,7 +1,7 @@
 # PROGRESS —— lingnan-curator
 
 ## 当前阶段
-**阶段 2（选型与架构）已完成落盘，等待人工评审 → 门禁 2**。通过后进入阶段 3（writing-plans 拆任务）。
+**阶段 3（拆任务）完成**：W1 实现计划已落盘 `docs/superpowers/plans/2026-08-24-w1-ingest-pipeline.md`（10 个任务，TDD 步进）。等待用户选定执行方式后进入阶段 4。
 
 ## 已完成
 - [2026-08-24] （上一会话）参赛方案拍板：「湾区记忆·岭南非遗 AI 策展人」；创建目录并 git init

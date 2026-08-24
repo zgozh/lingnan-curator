@@ -44,7 +44,7 @@
 | 上色 | 现成 DeOldify / 现成 DDColor / 云 API 付费 / 自研 | **DDColor 主选，DeOldify 兜底** | DDColor 更新且色彩更自然、纯 torch 栈；DeOldify 作环境失败备胎 | vendor repo + 独立环境 | 首次下载权重约 2GB |
 | OCR | 现成 PaddleOCR / 现成 RapidOCR / 云 OCR | **RapidOCR（PaddleOCR 为升级备选）** | pip 即装、onnxruntime、CPU 可用；OCR 属可降级信号，接入成本优先 | 繁体艺术招牌识别率有限（预期管理：caption 主要靠 VLM） | 无 |
 | LLM/VLM | DashScope qwen / OpenAI / Ollama 本地 / 自研 | **DashScope qwen-plus + qwen-vl-plus** | DocMind 已验证配方，key 已有 | 云端按量费用（低） | `DASHSCOPE_API_KEY` 写入 `.env` |
-| 向量检索 | Milvus+BGE-M3+CLIP+qwen3-rerank（DocMind 配方）/ Chroma / Qdrant | **沿用 DocMind 配方** | 四件套全部已在本人项目验证，权重本机已有缓存 | Docker Desktop 依赖 | 用时启动 Docker Desktop；W1 核对 DocMind 权重缓存路径 |
+| 向量检索 | Milvus+BGE-M3+Chinese-CLIP+qwen3-rerank（DocMind 配方）/ Chroma / Qdrant | **沿用 DocMind 配方，图像编码器定为 Chinese-CLIP ViT-B/16** | 四件套全部已在本人项目验证，权重本机已有缓存；查询词是中文故弃 OpenAI CLIP（中文文本塔弱） | Docker Desktop 依赖 | 用时启动 Docker Desktop；W1 核对 DocMind 权重缓存路径 |
 | Agent 编排 | LangGraph / 手写状态机 / 自研 | **LangGraph** | 条件路由/fan-out 已验证，复用学习成本 | 无新增 | 无 |
 | 粤语 TTS | DashScope cosyvoice（复用账号）/ Azure zh-HK / 火山引擎 / 本地 Cosyvoice2-Yue 开源权重 / 自研 | **TTSProvider seam，试听定稿；先实测 DashScope 粤语能力** | 复用现有账号最省；三家云端+一家本地都保留候选 | 半小时试听工作 | 同一段 200 字粤语稿试听对比；DashScope 不支持则注册 Azure |
 | 口型视频 | SadTalker / EchoMimicV2·V3 / LivePortrait / 云端数字人 / 自研 | **SadTalker** | 输入=照片+音频恰好匹配；约 4~6GB 显存适配 4060；Windows 教程成熟。EchoMimicV2 官方实测 ≥16GB 显存出局，LivePortrait 视频驱动不匹配 | 画质一般（够用）；需独立 py3.10 环境 | vendor repo + ffmpeg；权重约 4GB |
