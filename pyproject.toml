@@ -1,0 +1,21 @@
+[project]
+name = "lingnan-curator"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "openai>=3.3.1",
+    "pillow>=12.3.0",
+    "pymilvus>=3.0.1",
+    "python-dotenv>=1.2.3",
+    "rapidocr-onnxruntime>=1.4.4",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+addopts = "-p no:cacheprovider"
+markers = ["e2e: 真实链路集成测试(需外部服务)"]
