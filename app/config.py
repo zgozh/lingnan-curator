@@ -16,6 +16,9 @@ class Settings:
     vlm_model: str = "qwen-vl-plus"
     bge_m3_model_path: str = "BAAI/bge-m3"
     clip_model_path: str = "OFA-Sys/chinese-clip-vit-base-patch16"
+    tts_provider: str = "dashscope"
+    tts_voice: str = "longjiaxin_v3"  # CosyVoice 粤语：优雅女声
+    rerank_base_url: str = ""  # 空=跳过精排（降级直通）
 
     @staticmethod
     def load(env_file: str | None = ".env") -> "Settings":
@@ -31,4 +34,7 @@ class Settings:
             vlm_model=os.getenv("VLM_MODEL", d.vlm_model),
             bge_m3_model_path=os.getenv("BGE_M3_MODEL_PATH", d.bge_m3_model_path),
             clip_model_path=os.getenv("CLIP_MODEL_PATH", d.clip_model_path),
+            tts_provider=os.getenv("TTS_PROVIDER", d.tts_provider),
+            tts_voice=os.getenv("TTS_VOICE", d.tts_voice),
+            rerank_base_url=os.getenv("RERANK_BASE_URL", d.rerank_base_url),
         )
