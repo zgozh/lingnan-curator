@@ -54,10 +54,28 @@ def run_ragas(rows: list[dict], settings=None) -> dict:
     common = {"api_key": s.dashscope_api_key,
               "base_url": s.dashscope_base_url}
     llm = ChatOpenAI(model=s.llm_model, temperature=0, **common)
-    emb = OpenAIEmbeddings(model=_EMBED_MODEL, **common)
+    # 关键：关掉 tiktoken 预切分，否则发给 DashScope 的是 token 数组而非字符串
+    emb = OpenAIEmbeddings(model=_EMBED_MODEL,
+                           check_embedding_ctx_length=False, **common)
 
     result = _evaluate(ds, metrics=[faithfulness, answer_relevancy],
                        llm=llm, embeddings=emb)
-    scores = {k: float(result[k]) for k in _METRIC_KEYS if k in result}
+    scores = _extract_scores(result)
     logger.info("RAGAS 指标: %s", scores)
     return scores
+
+
+def _extract_scores(result) -> dict:
+    """兼容两种返回形态：EvaluationDataset(.scores 列表) / 平面映射。"""
+    import statistics
+
+    if hasattr(result, "scores"):
+        row_list = list(result.scores)
+        out = {}
+        for k in _METRIC_KEYS:
+            vals = [float(r[k]) for r in row_list
+                    if isinstance(r, dict) and k in r]
+            if vals:
+                out[k] = statistics.mean(vals)
+        return out
+    return {k: float(result[k]) for k in _METRIC_KEYS if k in result}

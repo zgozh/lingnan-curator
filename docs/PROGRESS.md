@@ -1,7 +1,15 @@
 # PROGRESS —— lingnan-curator
 
 ## 当前阶段
-**W2 完成（检索+三 Agent+展馆最小闭环）**：F2/F3/F4/F5/F7 全部落地，TDD 89 tests 绿；真实冒烟 SMOKE PASS——搜索"骑楼"命中 sample_a（场景1）、超范围问题 SSE 明确拒答（场景2后半）。服务可用 `uv run uvicorn app.web.main:app --port 8301` 体验。下一阶段：W3 口播 F6 + RAGAS F8 + 全量素材入库。
+**W3 进行中（口播+评测+精排+素材）**：T1 TTS 基座 ✅、T2 粤语听测样音 ✅（3 音色 wav 待用户拍板）、T3 narrator+CLI+详情页音频 ✅、T5 RAGAS 评测链路 ✅（真实跑通，指标提取修复后复跑中）；T4 SadTalker 环境就绪（cuda=True，权重下载中）、T6 rerank 模型下载切 ModelScope 源中；T7 素材候选清单已出（docs/素材候选清单.md，待用户收集 15~30 张）。下一节点：SadTalker 推理冒烟 → rerank 服务起→ 全量入库。
+
+## W3 执行记录（2026-08-24）
+- T1 ✅ d9127c6 app/infra/tts.py：DashScopeCosyvoice + _new_synthesizer seam；配置 tts_provider/tts_voice/rerank_base_url；.env.example 同步
+- T2 ✅ 05c5fd5 实测可用组合=cosyvoice-v2 × {longjiayi_v2 知性女, longtao_v2 积极女, longanyue 男}；v3 系音色需开通权限（418/AccessDenied）
+- T3 ✅ 9d0c037 agents/narrator.py write_script(粤语白话讲解词 json_mode)+narrate(音频降级标记)；cli narrate --pid 真实跑通 sample_a；详情页 <audio> 入口
+- T5 🔶 b75f0a4 cli eval 子命令（refused_accuracy+RAGAS 双指标+阈值判定+报告落盘 eval/reports/）+eval/questions.jsonl 20条(含5拒答)；ragas0.3.1×新langchain-community 的 vertexai 缺模块用 sys.modules shim 解决；DashScope embeddings 必须 check_embedding_ctx_length=False（否则发 token 数组报400）；评分取数兼容 EvaluationDataset.scores 均值聚合
+- T4 环境就绪 scripts/setup_sadtalker.ps1（py3.10 venv-st）：坑位记录——uv venv 无 setuptools→pkg_resources 缺失(face_alignment/librosa 需要)；setuptools≥81 彻底移除 pkg_resources 须钉 75.8.0；numba 必须钉 0.57.1 兼容 numpy1.23；basicsr1.4.2 无 wheel 且 uv 构建 temp 被拒→从 .uv-cache/sdists 解包 build/lib 直拷 site-packages；functional_tensor 补丁必须用「from ... import」语句级精确匹配（宽匹配会误伤 torch 内部文件）；ps1 含中文必须 UTF-8 BOM 否则 PS5.1 GBK 解析炸引号
+- T6 🔶 hf-mirror TLS 被掐（Invalid username/password 假象+连接重置），改 ModelScope Qwen/Qwen3-Reranker-0.6B 源 scripts/fetch_reranker_ms.py；服务端 scripts/rerank_server.py 已写（yes/no softmax 打分）
 
 ## W2 执行记录（2026-08-24）
 - T1 ✅ 644735e 检索基元：文本通道 WeightedRanker(0.8,0.2) + CLIP 通道 → RRF(k=60) 融合 → 归一化；CLIP 失败降级纯文本
