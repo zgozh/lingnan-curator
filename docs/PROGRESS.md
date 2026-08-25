@@ -1,10 +1,15 @@
 # PROGRESS —— lingnan-curator
 
 ## 当前阶段
-**W3 主体达成（口播/评测/精排全链路贯通，RAGAS 首次 meets=true）**：
-- 场景3 冒烟 ✅：narrate→TTS→SadTalker→`narration.mp4`(13.3MB) 可播放；RAGAS faithfulness=0.92≥0.80、answer_relevancy=0.86≥0.75 报告落盘（eval/reports/20260825-161502.json）
-- 精排服务 ✅：qwen3-rerank@127.0.0.1:8303 上线，/search degraded 清空
-- 待办：真实语料入库后复认证指标（现基于3张占位图）；SadTalker 单张 13min 超计划 5min 可优化（降采样/fp16）；用户试听定音色 + 提供 15~30 张公有领域照片
+**W3 完成（真实语料入库 + RAGAS 复认证 meets=true，全链路含精排在线）**：
+- 语料 ✅：Commons 三分类爬取→人工审核剔除后 **24 张公有领域广州老照片**入库
+  （meta.csv 六列齐全，license=PD/CC0/CC BY/CC BY-SA，source_url 可溯源）
+- 复认证 ✅（20260826-013134.json，qwen-max 判卷+精排在线）：faithfulness **0.888**≥0.80、
+  answer_relevancy **0.858**≥0.75、refused_accuracy **1.0**(5/5)；answer_rate 0.867
+  （15 应答题中 2 题被过度拒答，W4 演示前用 diag 定位）
+- 性能 ✅：主 venv torch 切 **cu126 GPU** 构建；rerank 服务改**批量单次前向**
+  （24 候选 19s→1.0s）；检索精排全程在线不降级
+- 下一步：**W4 = 申报书 PDF + 演示视频**（素材：本语料库 + eval/reports 数字进答辩 PPT）
 
 ## 指标爬坡记录（同代码下的关键修复）
 | 版本动作 | faithfulness | answer_relevancy |
@@ -15,6 +20,7 @@
 | 判卷人 qwen-max | 0.54 | 0.61 |
 | VLM 结构化 caption 增强 | 0.67 | 0.56 |
 | 讲解词去元话语+丰满化+**误拒隔离出 RAGAS 样本池** | **0.92** | **0.86** |
+| 真实语料 24 张复认证（精排在线） | 0.888 | 0.858 |
 
 教训：聚合分暴跌先查**喂给判卷人的样本质量**（误拒话术污染样本池），再谈调参；
 单轮波动大（±0.15），结论必须配合逐行诊断（scripts/diag_ragas_rows.py）。
@@ -26,6 +32,17 @@
 - T5 🔶 b75f0a4 cli eval 子命令（refused_accuracy+RAGAS 双指标+阈值判定+报告落盘 eval/reports/）+eval/questions.jsonl 20条(含5拒答)；ragas0.3.1×新langchain-community 的 vertexai 缺模块用 sys.modules shim 解决；DashScope embeddings 必须 check_embedding_ctx_length=False（否则发 token 数组报400）；评分取数兼容 EvaluationDataset.scores 均值聚合
 - T4 环境就绪 scripts/setup_sadtalker.ps1（py3.10 venv-st）：坑位记录——uv venv 无 setuptools→pkg_resources 缺失(face_alignment/librosa 需要)；setuptools≥81 彻底移除 pkg_resources 须钉 75.8.0；numba 必须钉 0.57.1 兼容 numpy1.23；basicsr1.4.2 无 wheel 且 uv 构建 temp 被拒→从 .uv-cache/sdists 解包 build/lib 直拷 site-packages；functional_tensor 补丁必须用「from ... import」语句级精确匹配（宽匹配会误伤 torch 内部文件）；ps1 含中文必须 UTF-8 BOM 否则 PS5.1 GBK 解析炸引号
 - T6 🔶 hf-mirror TLS 被掐（Invalid username/password 假象+连接重置），改 ModelScope Qwen/Qwen3-Reranker-0.6B 源 scripts/fetch_reranker_ms.py；服务端 scripts/rerank_server.py 已写（yes/no softmax 打分）
+
+## W3 收尾执行记录（2026-08-26）
+- **网络恢复**：直连全通（baidu/commons/upload CDN 均 OK）；v2rayN http:10809 未监听、socks:10808 可用但 urllib 不支持 socks5h → 爬虫走直连
+- **爬取器三连修**（TDD，各带回归测试）：①9656491 追加 meta.csv 对齐现有表头列序（原会 license/source_url 写串列）；②e3fb0b8 429/5xx 指数退避重试+逐张落盘 meta（崩溃可凭 photo_id 幂等续跑）+礼貌间隔+合规 UA；③e649f53 单张 api 异常跳过续跑+_safe_print 防 GBK 控制台崩溃（「française」的 ç 实测炸过）
+- **语料采集**：Historical_images_of_Guangzhou(30) + Historical_photographs_of_Guangzhou(18) + Historical_images_of_Shamian(3)，共 51 张落地
+- **人工审核剔除 27 张**（无视觉输入，按元数据证据审）：非照片类 21（摄影术 1839 年实用化→1662/1749/1785/1800/1807/1836/1842/1843 年份者必为画作；标题明示 Drawings/oil on canvas/书版画；Conseequa 铜版画；Anson 环球航行记插图——caption 读图后补抓的漏网鱼）、弱相关/疑似异地 4（袋鼠化装照/HK 开头/江西九江相册页等）、近似重复 2（Grant Hall 三张留一张）。落选件存 `data/raw/_rejected/`（含审核前 meta 备份）
+- **入库 ✅**：24 张全链路成功（restore→colorize→OCR→qwen-vl caption→BGE-M3+CLIP→Milvus），0 FAILED；10 个 OCR 空=DEGRADED 属纯画面照正常降级。报告 data/processed/_report.json
+- **评测集重写**：eval/questions.jsonl 全部按新语料 caption 重写 grounded 问题（15 应答+5 拒答）；scripts/corpus_dump.py 新工具（Milvus 语料检视/导出/purge）
+- **评测两轮**：①精排超时降级下 faithfulness 0.951/relevancy 0.831（报告 20260826-005050）；②修复后精排在线 0.888/0.858 + refused_accuracy 1.0（报告 20260826-013134，**以此为准**）
+- **精排性能修复**：1951591 服务端批量单次前向（padding 对齐，24 候选 19s→1.0s）+客户端超时 15s；32d9a7c 主 venv torch 切 cu126 GPU 构建（cu121 最高只到 torch2.5；2.13 的 win 轮子在 cu126），嵌入/精排上 GPU，RTX 4060 实测 CUDA 可用
+- SadTalker 13min/张提速：**挂起**（低优；W4 演示只需预生成少量视频，动 fp16/降采样有质量风险，待用户拍板）
 
 ## W2 执行记录（2026-08-24）
 - T1 ✅ 644735e 检索基元：文本通道 WeightedRanker(0.8,0.2) + CLIP 通道 → RRF(k=60) 融合 → 归一化；CLIP 失败降级纯文本
@@ -89,14 +106,16 @@
 - DASHSCOPE_API_KEY：未注入系统环境变量 → 项目统一走 `.env`（沿用 DocMind 习惯）
 
 ## 待办
+### W4（申报书 PDF + 演示视频）
+- [ ] 申报书：技术方案/架构图/创新点（RAGAS 评测数字进 PPT）/演示截图
+- [ ] 演示视频脚本+录制：照片墙→搜索→问答 SSE→专题展→详情页音色自选→口播视频
+- [ ] 演示前用 diag_ragas_rows 定位 15 应答题中 2 例过度拒答并微调闸门
+- [ ] 真实语料挑 3~5 张预生成口播（narrate→TTS→SadTalker；13min/张，安排过夜跑）
+- [ ] （可选）SadTalker 提速实验：降采样底图 / fp16，先小样验证质量再全量
+- [ ] smoke_web.py 断言仍耦合 sample_a/骑楼（已从语料剔除），改为动态取库内任一 pid
 ### 人（按优先级）
-- [ ] **评审阶段 2 产物**（`docs/architecture.md` + 9 条 ADR），确认后放行阶段 3 拆任务
-- [ ] 准备 DashScope API key（DocMind 账号可复用）、收集首批 15~30 张公开版权岭南老照片 + 补全 `data/raw/meta.csv`
-- [ ] W3 前：粤语 TTS 三路试听盲选（AI 会先备好样音与试听稿）、安装 ffmpeg
-- [ ] 用时启动 Docker Desktop（Milvus）
-### AI
-- [ ] 阶段 3：加载 writing-plans，产出 W1 实现计划（入库管线 + 3 张样张 spike 排雷 vendor 环境）
-- [ ] 阶段 4：TDD 逐任务实现
+- [ ] W4 启动会话里确认申报书模板/大赛格式要求、视频时长上限
+- [ ] 试听三音色定稿默认 voice（详情页已支持自选，不阻塞）
 
 ## 决策记录索引
 - ADR-0001 技术基座沿用 DocMind 配方
