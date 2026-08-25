@@ -83,6 +83,9 @@ class Embedder:
         raw_sparse = out.get("sparse") or []
         if raw_sparse and not isinstance(raw_sparse, list):
             raw_sparse = [raw_sparse]
+        # 契约：sparse 与 dense 批对齐；缺失的行用空 dict 占位
+        if len(raw_sparse) < len(dense):
+            raw_sparse = list(raw_sparse) + [{}] * (len(dense) - len(raw_sparse))
         sparse = [{int(k): float(v) for k, v in d.items()} for d in raw_sparse]
         return dense, sparse
 

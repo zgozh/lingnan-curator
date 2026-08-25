@@ -51,6 +51,23 @@ def test_texts_accepts_list(fake_loaders):
     assert len(d) == 2 and len(s) == 2
 
 
+def test_texts_sparse_missing_returns_aligned_empty_dicts(monkeypatch):
+    """BGE 未返回 sparse 时（如纯 dense 模式），输出必须与批对齐为 {}。"""
+
+    class NoSparseBGE:
+        def encode(self, sents, return_dense=True, return_sparse=True):
+            n = len([sents] if isinstance(sents, str) else sents)
+            return {"dense_vecs": [[0.1] * 8] * n, "sparse": None}
+
+    monkeypatch.setattr(emb, "_load_bge", lambda settings=None: NoSparseBGE())
+    emb.reset_embedder()
+    try:
+        d, s = Embedder().texts(["a", "b"])
+        assert len(d) == 2 and s == [{}, {}]
+    finally:
+        emb.reset_embedder()
+
+
 def test_empty_string_no_raise(fake_loaders):
     d, s = Embedder().texts("")
     assert len(d) == 1
