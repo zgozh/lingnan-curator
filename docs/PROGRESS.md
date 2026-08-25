@@ -1,7 +1,7 @@
 # PROGRESS —— lingnan-curator
 
 ## 当前阶段
-**阶段 4 实现中（W1）**：Task 1~9 完成（TDD 全绿 50 tests），T7 vendor spike 实测双通（restore+colorize 真实出图）。剩 T10 e2e 冒烟——仅差 Milvus 启动（用户跑 `docker compose up -d milvus`）。
+**阶段 4 完成（W1 全绿）**：Task 1~10 全部完成（TDD 53 tests）。e2e 冒烟报告 OK=14 / DEGRADED=1 / FAILED=0（唯一降级为纯画面照 OCR 无文字，属设计内），Milvus 落库 3/3。下一阶段：W2 混合检索 + 三 Agent + Web 展馆最小闭环。
 
 ## W1 执行记录
 - [2026-08-24] Task1 ✅ ec80256 骨架+Settings+PhotoRecord/IngestReport
@@ -13,6 +13,13 @@
 - [2026-08-24] Task7 ✅ **vendor spike 全通**：CF restore=True(21s) + DDColor colorize=True(17s)，样张真实出图（见下方 spike 结论）
 - [2026-08-24] Task8 ✅ b48ed55/f75818e/050f599 pipeline 编排+CLI ingest 子命令；caption 无 key 构造失败也走降级
 - [2026-08-24] Task9 ✅ 9f45106 README 六步快速开始 + `.env` 骨架
+- [2026-08-24] Task10 ✅ **e2e 冒烟全通**：OK=14/DEGRADED=1/FAILED=0，Milvus(v2.4.15) 落库 3/3；caption=qwen-vl 真模型；修复链：HF symlink 特权→本地模型目录、xet 禁用、CLIP 正确 id=patch16、transformers5.x pooler_output 解包、texts 批形状解包、幂等 ensure_collection、sparse 缺失对齐（提交至 eed1d12）
+
+### T10 嵌入模型本地化（重要，后续会话必读）
+- **不要让 transformers 走 HF 缓存**：Windows 符号链接需特权(WinError 1314)+沙箱拒建链 → 两塔模型已预下到 `models/hub-local/{bge-m3,chinese-clip}`（snapshot_download local_dir 纯复制 + HF_HUB_DISABLE_XET=1），`.env` 以 BGE_M3_MODEL_PATH/CLIP_MODEL_PATH 指向本地目录
+- **Chinese-CLIP 正确 repo id 是 `OFA-Sys/chinese-clip-vit-base-patch16`**（不是 p16）；config.py 默认已改
+- **transformers 5.x 坑**：ChineseCLIPModel.get_image_features 返回 vision ModelOutput，投影嵌入在 `.pooler_output`（embedder 已防御解包 image_embeds→pooler_output→tensor）
+- Milvus 镜像用本机已有 v2.4.15（compose 已改）；容器偶发重启窗口会导致瞬时连接失败，重试即可
 
 ### T7 vendor spike 结论（重要，后续会话必读）
 - **CodeFormer**：用其仓库自带 vendored basicsr（缺 `basicsr/version.py`，已手补最小版）；venv-cf 需显式装 `lpips` 等。PyPI `basicsr` sdist 在沙箱内构建被拒 → 不 pip 安装 basicsr。
