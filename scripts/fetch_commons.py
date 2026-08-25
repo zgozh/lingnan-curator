@@ -14,6 +14,8 @@ import csv
 import json
 import re
 import sys
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -21,7 +23,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data/raw"
 META = RAW / "meta.csv"
-_UA = {"User-Agent": "lingnan-curator/0.1 (student contest demo)"}
+# Commons 机器人政策要求 UA 可识别且含联系方式；纯泛化 UA 易触发 429
+_UA = {"User-Agent": "lingnan-curator/0.1 (student contest demo; "
+                     "contact: local developer, China)"}
 _API = "https://commons.wikimedia.org/w/api.php"
 _META_FIELDS = ["photo_id", "title", "year", "location", "license",
                 "source_url"]
@@ -65,10 +69,32 @@ def _opener(proxy: str | None):
     return urllib.request.build_opener()
 
 
+_RETRY_CODES = (429, 500, 502, 503)
+_POLITE = 1.0  # 每次出网请求前的礼貌间隔（秒），规避 robot policy 限流
+
+
+def _open_with_retry(opener, req, timeout: int, tries: int = 4):
+    """429/5xx/网络错误指数退避重试；其余异常直接抛。"""
+    last: Exception | None = None
+    for attempt in range(tries):
+        try:
+            return opener.open(req, timeout=timeout)
+        except urllib.error.HTTPError as exc:
+            if exc.code not in _RETRY_CODES or attempt == tries - 1:
+                raise
+            last = exc
+        except urllib.error.URLError as exc:
+            if attempt == tries - 1:
+                raise
+            last = exc
+        time.sleep(min(2 ** attempt * 2, 30))
+    raise last  # pragma: no cover —— 循环内必 return/raise
+
+
 def _api(opener, **params) -> dict:
     url = _API + "?" + urllib.parse.urlencode({"format": "json", **params})
     req = urllib.request.Request(url, headers=_UA)
-    with opener.open(req, timeout=90) as r:
+    with _open_with_retry(opener, req, timeout=90) as r:
         return json.loads(r.read().decode("utf-8"))
 
 
@@ -98,6 +124,7 @@ def _file_titles(opener, category: str, search: str, limit: int):
 
 
 def _info(opener, title: str, out_width: int) -> dict | None:
+    time.sleep(_POLITE)
     data = _api(opener, action="query", titles=title, prop="imageinfo",
                 iiprop="url|size|extmetadata|mime", iiurlwidth=out_width)
     for page in data.get("query", {}).get("pages", {}).values():
@@ -122,14 +149,32 @@ def _info(opener, title: str, out_width: int) -> dict | None:
 
 def _download(opener, url: str, dest: Path) -> bool:
     try:
+        time.sleep(_POLITE)
         req = urllib.request.Request(url, headers=_UA)
-        with opener.open(req, timeout=180) as r, open(dest, "wb") as f:
+        with _open_with_retry(opener, req, timeout=180) as r, \
+                open(dest, "wb") as f:
             while chunk := r.read(1 << 20):
                 f.write(chunk)
         return dest.stat().st_size > 10_000
     except Exception as exc:  # noqa: BLE001 —— 单张失败不拖垮批次
         print(f"  [dl-fail] {exc}")
         return False
+
+
+def _append_rows(csv_path: Path, rows: list[dict]) -> None:
+    """逐批落盘；已有文件必须对齐现有表头列序（防 DictWriter 写串列）。"""
+    exists = csv_path.exists()
+    fields = _META_FIELDS
+    if exists:
+        with open(csv_path, encoding="utf-8-sig", newline="") as f:
+            header = next(csv.reader(f), None)
+        if header and set(header) == set(_META_FIELDS):
+            fields = header
+    with open(csv_path, "a", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields)
+        if not exists:
+            w.writeheader()
+        w.writerows(rows)
 
 
 def main(argv=None) -> None:
@@ -170,30 +215,18 @@ def main(argv=None) -> None:
         if not _download(opener, info["thumb"], dest):
             continue
         idx += 1
-        new_meta.append({
+        row = {
             "photo_id": slug,
             "title": re.sub(r"^File:", "", title),
             "year": _year_from(info["date"]),
             "location": args.location,
             "license": info["license"],
             "source_url": info["page"],
-        })
+        }
+        new_meta.append(row)
+        _append_rows(META, [row])  # 逐张落盘：崩溃后可凭 photo_id 幂等续跑
         print(f"  [OK] {slug} <- {title[:52]}")
 
-    if new_meta:
-        exists = META.exists()
-        fields = _META_FIELDS
-        if exists:
-            with open(META, encoding="utf-8-sig", newline="") as f:
-                header = next(csv.reader(f), None)
-            # 追加必须对齐现有表头列序，否则 DictWriter 会把值写串列
-            if header and set(header) == set(_META_FIELDS):
-                fields = header
-        with open(META, "a", encoding="utf-8", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=fields)
-            if not exists:
-                w.writeheader()
-            w.writerows(new_meta)
     print(f"\n=== 新增 {len(new_meta)} 张，meta.csv 现有 "
           f"{len(_existing_ids(META))} 条 ===")
 

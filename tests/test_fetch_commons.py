@@ -1,4 +1,11 @@
 """fetch_commons 纯函数测试：许可白名单/年份提取/slug。"""
+import io
+import json
+import urllib.error
+from email.message import Message
+
+import pytest
+
 import scripts.fetch_commons as fc
 
 
@@ -70,3 +77,82 @@ def test_append_aligns_existing_header_order(tmp_path, monkeypatch):
     assert added[0]["license"] == "Public domain"
     assert added[0]["source_url"].startswith("https://commons.wikimedia.org/")
     assert added[0]["title"] == "Foo Bar.jpg"
+
+
+class _Resp:
+    def __init__(self, payload):
+        self._p = json.dumps(payload).encode("utf-8")
+
+    def read(self):
+        return self._p
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+class _FlakyOpener:
+    """按序返回预设响应/异常，模拟 429 限流。"""
+
+    def __init__(self, responses):
+        self._rs = list(responses)
+
+    def open(self, req, timeout=None):
+        r = self._rs.pop(0)
+        if isinstance(r, Exception):
+            raise r
+        return r
+
+
+def _http_error(code):
+    return urllib.error.HTTPError(
+        "https://commons.wikimedia.org/w/api.php", code, "err", Message(),
+        io.BytesIO(b""))
+
+
+def test_api_retries_on_429(monkeypatch):
+    monkeypatch.setattr(fc.time, "sleep", lambda s: None)
+    op = _FlakyOpener([_http_error(429), _http_error(500),
+                       _Resp({"query": {"pages": {}}})])
+    data = fc._api(op, action="query", titles="File:X.jpg")
+    assert data == {"query": {"pages": {}}}
+
+
+def test_api_gives_up_after_tries(monkeypatch):
+    monkeypatch.setattr(fc.time, "sleep", lambda s: None)
+    op = _FlakyOpener([_http_error(429)] * 8)
+    with pytest.raises(urllib.error.HTTPError):
+        fc._api(op, action="query", titles="File:X.jpg")
+
+
+def test_meta_flushed_incrementally_when_later_title_crashes(tmp_path, monkeypatch):
+    """中途崩溃时已成功的行必须已在 meta.csv（断点续跑靠 photo_id 幂等）。"""
+    good = {"title": "File:Good.jpg", "thumb": "https://x/t.jpg",
+            "width": 1600, "mime": "image/jpeg", "license": "CC BY-SA 3.0",
+            "date": "1930-01-01",
+            "page": "https://commons.wikimedia.org/wiki/File:Good.jpg"}
+
+    def fake_info(opener, title, width):
+        if title == "File:Bad.jpg":
+            raise _http_error(429)
+        return good
+
+    monkeypatch.setattr(fc, "RAW", tmp_path)
+    monkeypatch.setattr(fc, "META", tmp_path / "meta.csv")
+    monkeypatch.setattr(fc, "_file_titles",
+                        lambda o, c, s, l: iter(["File:Good.jpg", "File:Bad.jpg"]))
+    monkeypatch.setattr(fc, "_info", fake_info)
+    monkeypatch.setattr(fc, "_download",
+                        lambda o, u, d: (d.write_bytes(b"x" * 20480) or True))
+
+    with pytest.raises(urllib.error.HTTPError):
+        fc.main(["--category", "X", "--limit", "5", "--location", "广州"])
+
+    import csv
+    with open(tmp_path / "meta.csv", encoding="utf-8-sig", newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert len(rows) == 1
+    assert rows[0]["photo_id"].startswith("gz_")
+    assert rows[0]["license"] == "CC BY-SA 3.0"
