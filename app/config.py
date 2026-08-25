@@ -17,7 +17,7 @@ class Settings:
     bge_m3_model_path: str = "BAAI/bge-m3"
     clip_model_path: str = "OFA-Sys/chinese-clip-vit-base-patch16"
     tts_provider: str = "dashscope"
-    tts_voice: str = "longjiaxin_v3"  # CosyVoice 粤语：优雅女声
+    tts_voice: str = "longjiayi_v2"  # CosyVoice 粤语：知性女声（v2 可用）
     rerank_base_url: str = ""  # 空=跳过精排（降级直通）
 
     @staticmethod
