@@ -31,11 +31,12 @@ def _patch(monkeypatch, fused=None):
 
 def test_rerank_reorders_when_available(monkeypatch):
     _patch(monkeypatch)
+    # 精排把 b 提到最前；除 d 外均高于断崖线
     monkeypatch.setattr(rp.rr, "rerank", lambda q, docs, base_url,
-                        timeout=5.0: [0.1, 0.9, 0.5, 0.0]
+                        timeout=5.0: [0.5, 0.9, 0.7, 0.0]
                         if len(docs) == 4 else None)
     out = rp.search("骑楼", top_k=4, base_url="http://x")
-    # 精排重排为 b>c>a>d；d 归一后 0.0 < 断崖阈值(1.0×0.35) 被截掉
+    # 精排重排为 b>c>a；d 归一后 0.0 < 断崖阈值(1.0×0.35) 被截掉
     assert [h.photo_id for h in out.hits] == ["b", "c", "a"]
     assert "rerank" not in out.degraded
 
