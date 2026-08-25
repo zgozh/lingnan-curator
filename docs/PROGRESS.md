@@ -1,7 +1,23 @@
 # PROGRESS —— lingnan-curator
 
 ## 当前阶段
-**W3 进行中（口播+评测+精排+素材）**：T1 TTS 基座 ✅、T2 粤语听测样音 ✅（3 音色 wav 待用户拍板）、T3 narrator+CLI+详情页音频 ✅、T5 RAGAS 评测链路 ✅（真实跑通，指标提取修复后复跑中）；T4 SadTalker 环境就绪（cuda=True，权重下载中）、T6 rerank 模型下载切 ModelScope 源中；T7 素材候选清单已出（docs/素材候选清单.md，待用户收集 15~30 张）。下一节点：SadTalker 推理冒烟 → rerank 服务起→ 全量入库。
+**W3 主体达成（口播/评测/精排全链路贯通，RAGAS 首次 meets=true）**：
+- 场景3 冒烟 ✅：narrate→TTS→SadTalker→`narration.mp4`(13.3MB) 可播放；RAGAS faithfulness=0.92≥0.80、answer_relevancy=0.86≥0.75 报告落盘（eval/reports/20260825-161502.json）
+- 精排服务 ✅：qwen3-rerank@127.0.0.1:8303 上线，/search degraded 清空
+- 待办：真实语料入库后复认证指标（现基于3张占位图）；SadTalker 单张 13min 超计划 5min 可优化（降采样/fp16）；用户试听定音色 + 提供 15~30 张公有领域照片
+
+## 指标爬坡记录（同代码下的关键修复）
+| 版本动作 | faithfulness | answer_relevancy |
+|---|---|---|
+| 初版（contexts 空） | 0.00 | 0.24 |
+| contexts 回填 caption | 0.12 | 0.26 |
+| +著录元数据(year/location) | 0.71→0.78 | 0.42~0.61 |
+| 判卷人 qwen-max | 0.54 | 0.61 |
+| VLM 结构化 caption 增强 | 0.67 | 0.56 |
+| 讲解词去元话语+丰满化+**误拒隔离出 RAGAS 样本池** | **0.92** | **0.86** |
+
+教训：聚合分暴跌先查**喂给判卷人的样本质量**（误拒话术污染样本池），再谈调参；
+单轮波动大（±0.15），结论必须配合逐行诊断（scripts/diag_ragas_rows.py）。
 
 ## W3 执行记录（2026-08-24）
 - T1 ✅ d9127c6 app/infra/tts.py：DashScopeCosyvoice + _new_synthesizer seam；配置 tts_provider/tts_voice/rerank_base_url；.env.example 同步
