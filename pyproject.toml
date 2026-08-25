@@ -28,6 +28,16 @@ dev = [
     "pytest>=9.1.1",
 ]
 
+# torch 切 CUDA 构建（RTX 4060）：嵌入/精排上 GPU，候选多时不再超时
+# cu121 最高只有 torch2.5；2.13 的 win 轮子在 cu126
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu126" }
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
