@@ -53,6 +53,76 @@ def cmd_narrate(args) -> None:
     print(f"讲解词：{result.get('script', '')[:80]}…")
 
 
+def _ask(question: str, settings=None) -> dict:
+    """seam：评测批量问答入口（真实实现=docent.ask）。"""
+    from app.agents.docent import ask
+
+    return ask(question, settings=settings)
+
+
+def _run_ragas(rows: list[dict], settings=None) -> dict:
+    """seam：RAGAS 指标计算（懒加载重依赖，测试替换）。"""
+    from app.eval.ragas_runner import run_ragas
+
+    return run_ragas(rows, settings)
+
+
+def cmd_eval_impl(questions_path, report_path, settings=None) -> bool:
+    """F8：批量问答 → refused_accuracy + RAGAS 指标 → 报告落盘。
+
+    返回是否达到验收线（faithfulness≥0.80 且 answer_relevancy≥0.75）。
+    """
+    import json
+    import time
+    from pathlib import Path as _Path
+
+    rows = [json.loads(line) for line in
+            _Path(questions_path).read_text(encoding="utf-8").splitlines()
+            if line.strip()]
+    answered, refusals = [], []
+    for q in rows:
+        res = _ask(q["question"], settings)
+        entry = {"qid": q["qid"], "question": q["question"],
+                 "answer": res.get("answer", ""),
+                 "contexts": res.get("contexts", []),
+                 "refused": res.get("refused", False)}
+        (refusals if q.get("refusal") else answered).append(entry)
+
+    refused_correct = sum(
+        1 for e in refusals if e["refused"]) if refusals else 0
+    refused_accuracy = (refused_correct / len(refusals)) if refusals else None
+
+    ragas_scores = (_run_ragas(answered, settings)
+                    if answered else {})
+    faith = float(ragas_scores.get("faithfulness", 0.0))
+    relev = float(ragas_scores.get("answer_relevancy", 0.0))
+    meets = (faith >= 0.80 and relev >= 0.75
+             and refused_accuracy == 1.0 if refused_accuracy is not None
+             else faith >= 0.80 and relev >= 0.75)
+
+    report = {"generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+              "total": len(rows), "answered": len(answered),
+              "refusals": len(refusals),
+              "refused_accuracy": refused_accuracy,
+              **ragas_scores, "meets_threshold": meets}
+    out = _Path(report_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, ensure_ascii=False, indent=2),
+                   encoding="utf-8")
+    print(f"[eval] 报告已写入 {out} meets={meets}")
+    return meets
+
+
+def cmd_eval(args) -> None:
+    from datetime import datetime
+    from pathlib import Path
+
+    ok = cmd_eval_impl(
+        Path("eval/questions.jsonl"),
+        Path("eval/reports") / f"{datetime.now():%Y%m%d-%H%M%S}.json")
+    raise SystemExit(0 if ok else 2)
+
+
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="lingnan", description="岭南非遗 AI 策展人")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -66,7 +136,11 @@ def main(argv: list[str] | None = None) -> None:
     na.add_argument("--pid", required=True, help="photo_id")
     na.set_defaults(func=cmd_narrate)
 
-    for name in ("serve", "eval"):
+    ev = sub.add_parser("eval", help="RAGAS 评测：批量问答→指标→报告")
+    ev.add_argument("--questions", default="eval/questions.jsonl")
+    ev.set_defaults(func=cmd_eval)
+
+    for name in ("serve",):
         sp = sub.add_parser(name)
         sp.set_defaults(func=_not_impl(name))
 
