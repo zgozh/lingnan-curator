@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}检索 · {{ q }}{% endblock %}
+{% block body %}
+<h1>混合检索结果{% if q %}：“{{ q }}”{% endif %}</h1>
+<form action="/search" method="get" class="searchbar">
+  <input name="q" value="{{ q }}" placeholder="关键词…">
+  <button>检索</button>
+</form>
+{% if degraded %}<p class="hint">⚠️ 已降级通道：{{ degraded | join('、') }}
+（对应外部服务不可用，结果仍可用）</p>{% endif %}
+<div class="grid">
+  {% for h in hits %}
+  <a class="card" href="/photo/{{ h.photo_id }}">
+    <img src="/media/{{ h.photo_id }}/restored.jpg"
+         onerror="this.src='/static/placeholder.svg'" alt="{{ h.title }}">
+    <div class="card-body">
+      <strong>{{ h.title }}</strong>
+      <small>{{ h.caption or '（无描述）' }}</small>
+      <small class="score">相关度 {{ (h.score * 100) | round(0) | int }}%</small>
+    </div>
+  </a>
+  {% else %}{% if q %}<p class="empty">没有匹配的馆藏。</p>{% endif %}{% endfor %}
+</div>
+{% endblock %}

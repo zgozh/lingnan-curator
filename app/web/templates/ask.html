@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}问展馆 · 湾区记忆{% endblock %}
+{% block scripts %}<script src="/static/ask.js" defer></script>{% endblock %}
+{% block body %}
+<h1>问展馆（带证据回答 · SSE 流式）</h1>
+<div id="chat-log"></div>
+<form id="ask-form" class="searchbar">
+  <input id="ask-q" placeholder="例如：西关大屋有什么特点？" autocomplete="off">
+  <button>提问</button>
+</form>
+<p class="hint">回答仅依据馆藏著录；超出范围会明确拒答，不编造。</p>
+{% endblock %}

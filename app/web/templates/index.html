@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}照片墙 · 湾区记忆{% endblock %}
+{% block body %}
+<h1>馆藏照片墙</h1>
+<form action="/search" method="get" class="searchbar">
+  <input name="q" placeholder="搜索：骑楼 / 粤剧 / 西关…" autofocus>
+  <button>检索</button>
+  <span class="spacer"></span>
+  <button formaction="/exhibit" formmethod="get" name="theme"
+          value="">AI 策展</button>
+</form>
+<div class="grid">
+  {% for p in photos %}
+  <a class="card" href="/photo/{{ p.photo_id }}">
+    <img src="/media/{{ p.photo_id }}/restored.jpg"
+         onerror="this.src='/static/placeholder.svg'" alt="{{ p.title }}">
+    <div class="card-body">
+      <strong>{{ p.title }}</strong>
+      <small>{{ p.year or '年代不详' }} · {{ p.location or '地点不详' }}
+        {% if p.has_colorized %}<span class="tag">已上色</span>{% endif %}</small>
+    </div>
+  </a>
+  {% else %}
+  <p class="empty">馆藏为空。请先运行入库：
+    <code>uv run python -m app.cli ingest --src data/raw</code></p>
+  {% endfor %}
+</div>
+{% endblock %}

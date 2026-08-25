@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ p.title }} · 详情{% endblock %}
+{% block body %}
+<h1>{{ p.title }}</h1>
+<p class="hint">{{ p.year or '年代不详' }} · {{ p.location or '地点不详' }}
+  ｜来源：<a href="{{ p.source_url }}" rel="license noopener"
+     target="_blank">{{ p.license }}</a></p>
+
+<div class="compare" data-has-colorized="{{ '1' if has_colorized else '0' }}">
+  {% if has_colorized %}
+  <div class="slider">
+    <img class="layer base" src="/media/{{ pid }}/restored.jpg" alt="修复后">
+    <img class="layer top" src="/media/{{ pid }}/colorized.jpg" alt="上色后">
+    <input type="range" min="0" max="100" value="50"
+           aria-label="上色对比滑块">
+  </div>
+  <p class="hint">拖动滑块对比：修复原图 ↔ AI 上色</p>
+  {% else %}
+  <img src="/media/{{ pid }}/restored.jpg" alt="修复后">
+  <p class="hint">本张未完成上色（管线降级），仅展示修复结果。</p>
+  {% endif %}
+</div>
+
+<section>
+  <h2>AI 著录</h2>
+  <p>{{ p.caption or '（暂无）' }}</p>
+</section>
+
+<section>
+  <h2>OCR 提取文字</h2>
+  <pre class="ocr">{% if p.ocr_text %}{{ p.ocr_text }}{% else %}（本张无识别文字）{% endif %}</pre>
+</section>
+
+<section>
+  <h2>文创生成</h2>
+  <div class="chiprow">
+    {% for t in ['postcard', 'slogan', 'moments'] %}
+    <button class="chip" data-pid="{{ pid }}" data-type="{{ t }}">{{ t }}</button>
+    {% endfor %}
+  </div>
+  <div id="copy-out" class="copy"></div>
+</section>
+{% endblock %}
+{% block scripts %}<script src="/static/detail.js" defer></script>{% endblock %}

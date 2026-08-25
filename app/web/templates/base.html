@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}湾区记忆 · 岭南非遗 AI 策展人{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">🏛️ 湾区记忆</a>
+  <nav>
+    <a href="/">照片墙</a><a href="/exhibit">专题展</a><a href="/ask">问展馆</a>
+  </nav>
+</header>
+{% if flags is defined and not flags.get('milvus', true) %}
+<div class="banner warn">
+  ⚠️ 检索库(Milvus)未连接。请先打开 Docker Desktop 并在项目目录执行：
+  <code>docker compose up -d milvus</code>（端口 127.0.0.1:19530）
+</div>
+{% endif %}
+<main>{% block body %}{% endblock %}</main>
+<footer class="foot">
+  庆园杯参赛项目 · 素材均登记来源与许可 · AI 生成内容仅供参考
+</footer>
+{% block scripts %}{% endblock %}
+</body>
+</html>

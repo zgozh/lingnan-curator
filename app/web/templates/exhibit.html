@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}专题展 · 湾区记忆{% endblock %}
+{% block body %}
+<h1>AI 策展 · 专题展</h1>
+<form action="/exhibit" method="get" class="searchbar">
+  <input name="theme" value="{{ result.theme }}" placeholder="输入主题，如：骑楼、粤剧、西关…">
+  <button>开始策展</button>
+</form>
+{% for sec in result.sections %}
+<section class="exhibit-sec">
+  <h2>{{ loop.index }}. {{ sec.title }}</h2>
+  <p class="narrative">{{ sec.narrative }}</p>
+  <div class="grid">
+    {% for pid in sec.photo_ids %}
+    <a class="card" href="/photo/{{ pid }}">
+      <img src="/media/{{ pid }}/restored.jpg"
+           onerror="this.src='/static/placeholder.svg'" alt="">
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% else %}{% if result.theme %}
+<p class="empty">{% if result.refused %}该主题下暂无可策展的馆藏。{% endif %}</p>
+{% endif %}{% endfor %}
+{% endblock %}
