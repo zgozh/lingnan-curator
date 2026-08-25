@@ -127,8 +127,8 @@ def test_api_gives_up_after_tries(monkeypatch):
         fc._api(op, action="query", titles="File:X.jpg")
 
 
-def test_meta_flushed_incrementally_when_later_title_crashes(tmp_path, monkeypatch):
-    """中途崩溃时已成功的行必须已在 meta.csv（断点续跑靠 photo_id 幂等）。"""
+def test_api_error_skips_title_and_continues(tmp_path, monkeypatch):
+    """单张 imageinfo 失败(如 429 重试耗尽)只跳过该张，不拖垮整批。"""
     good = {"title": "File:Good.jpg", "thumb": "https://x/t.jpg",
             "width": 1600, "mime": "image/jpeg", "license": "CC BY-SA 3.0",
             "date": "1930-01-01",
@@ -142,17 +142,30 @@ def test_meta_flushed_incrementally_when_later_title_crashes(tmp_path, monkeypat
     monkeypatch.setattr(fc, "RAW", tmp_path)
     monkeypatch.setattr(fc, "META", tmp_path / "meta.csv")
     monkeypatch.setattr(fc, "_file_titles",
-                        lambda o, c, s, l: iter(["File:Good.jpg", "File:Bad.jpg"]))
+                        lambda o, c, s, l: iter(
+                            ["File:Good.jpg", "File:Bad.jpg",
+                             "File:Good 2.jpg"]))
     monkeypatch.setattr(fc, "_info", fake_info)
     monkeypatch.setattr(fc, "_download",
                         lambda o, u, d: (d.write_bytes(b"x" * 20480) or True))
+    monkeypatch.setattr(fc.time, "sleep", lambda s: None)
 
-    with pytest.raises(urllib.error.HTTPError):
-        fc.main(["--category", "X", "--limit", "5", "--location", "广州"])
+    fc.main(["--category", "X", "--limit", "5", "--location", "广州"])  # 不抛
 
     import csv
     with open(tmp_path / "meta.csv", encoding="utf-8-sig", newline="") as f:
         rows = list(csv.DictReader(f))
-    assert len(rows) == 1
-    assert rows[0]["photo_id"].startswith("gz_")
-    assert rows[0]["license"] == "CC BY-SA 3.0"
+    assert len(rows) == 2  # Bad 被跳过，前后两张都入库
+    assert all(r["photo_id"].startswith("gz_") for r in rows)
+    assert all(r["license"] == "CC BY-SA 3.0" for r in rows)
+
+
+def test_stdout_survives_gbk_console(tmp_path, monkeypatch):
+    """标题含 GBK 外字符(如 œ)时打印不得让脚本崩溃(替换为 ?)。"""
+    import io as _io
+    fake_out = _io.TextIOWrapper(_io.BytesIO(), encoding="gbk",
+                                 errors="strict")
+    monkeypatch.setattr(fc.sys, "stdout", fake_out)
+    fc._safe_print("  [OK] Grant Hall œuvre")
+    fake_out.flush()
+    assert b"?uvre" in fake_out.buffer.getvalue()

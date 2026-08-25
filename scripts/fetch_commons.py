@@ -157,7 +157,7 @@ def _download(opener, url: str, dest: Path) -> bool:
                 f.write(chunk)
         return dest.stat().st_size > 10_000
     except Exception as exc:  # noqa: BLE001 —— 单张失败不拖垮批次
-        print(f"  [dl-fail] {exc}")
+        _safe_print(f"  [dl-fail] {exc}")
         return False
 
 
@@ -175,6 +175,15 @@ def _append_rows(csv_path: Path, rows: list[dict]) -> None:
         if not exists:
             w.writeheader()
         w.writerows(rows)
+
+
+def _safe_print(msg: str) -> None:
+    """GBK 控制台打印 GBK 外字符(如 œ)不得让脚本崩溃。"""
+    try:
+        print(msg)
+    except UnicodeEncodeError:
+        enc = sys.stdout.encoding or "ascii"
+        print(msg.encode(enc, errors="replace").decode(enc, errors="replace"))
 
 
 def main(argv=None) -> None:
@@ -198,16 +207,20 @@ def main(argv=None) -> None:
                               args.limit * 3):
         if len(new_meta) >= args.limit:
             break
-        info = _info(opener, title, args.out_width)
+        try:
+            info = _info(opener, title, args.out_width)
+        except Exception as exc:  # noqa: BLE001 —— 单张失败不拖垮批次
+            _safe_print(f"  [skip] api-fail {exc}: {title[:44]}")
+            continue
         if not info:
             continue
         if info["mime"] not in ("image/jpeg", "image/png"):
             continue
         if info["width"] < args.min_width:
-            print(f"  [skip] 太窄 {info['width']}px: {title[:48]}")
+            _safe_print(f"  [skip] 太窄 {info['width']}px: {title[:48]}")
             continue
         if not _license_ok(info["license"]):
-            print(f"  [skip] 许可[{info['license'][:28]}]: {title[:40]}")
+            _safe_print(f"  [skip] 许可[{info['license'][:28]}]: {title[:40]}")
             continue
 
         slug = _slug(title, idx)
@@ -225,10 +238,10 @@ def main(argv=None) -> None:
         }
         new_meta.append(row)
         _append_rows(META, [row])  # 逐张落盘：崩溃后可凭 photo_id 幂等续跑
-        print(f"  [OK] {slug} <- {title[:52]}")
+        _safe_print(f"  [OK] {slug} <- {title[:52]}")
 
-    print(f"\n=== 新增 {len(new_meta)} 张，meta.csv 现有 "
-          f"{len(_existing_ids(META))} 条 ===")
+    _safe_print(f"\n=== 新增 {len(new_meta)} 张，meta.csv 现有 "
+                f"{len(_existing_ids(META))} 条 ===")
 
 
 if __name__ == "__main__":
