@@ -12,8 +12,9 @@ from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.agents import creator, curator, docent
+from app.agents import creator, curator, docent, narrator
 from app.infra import reranker as rr
+from app.infra.tts import VOICES
 from app.retrieval import pipeline as rpipe
 
 logger = logging.getLogger(__name__)
@@ -127,6 +128,7 @@ def create_app() -> FastAPI:
              and (base / "colorized.jpg").exists(),
              "has_narration": (base / "narration.wav").exists(),
              "has_video": (base / "narration.mp4").exists(),
+             "voices": VOICES,
              "tts_voice": _settings().tts_voice},
         )
 
@@ -150,6 +152,18 @@ def create_app() -> FastAPI:
                 yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
 
         return StreamingResponse(gen(), media_type="text/event-stream")
+
+    @app.post("/api/narrate/{photo_id}")
+    def api_narrate(photo_id: str, body: dict):
+        voice = str(body.get("voice") or "") or None
+        if voice is not None and voice not in VOICES:
+            raise HTTPException(400, f"不支持的音色: {voice}，"
+                                     f"可选: {sorted(VOICES)}")
+        result = narrator.narrate(photo_id, voice=voice)
+        if "error" in result:
+            msg = result["error"]
+            raise HTTPException(404 if "不存在" in msg else 502, msg)
+        return result
 
     @app.post("/api/create/{photo_id}")
     def api_create(photo_id: str, body: dict):

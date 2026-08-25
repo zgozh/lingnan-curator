@@ -69,8 +69,11 @@ def _tts(settings=None):
     return get_tts(settings)
 
 
-def narrate(photo_id: str, settings=None) -> dict:
-    """生成讲解词并合成音频；返回 {audio: bool, degraded: bool, ...}。"""
+def narrate(photo_id: str, settings=None, voice: str | None = None) -> dict:
+    """生成讲解词并合成音频；返回 {audio: bool, degraded: bool, ...}。
+
+    voice 缺省用配置默认值；前端音色选择器显式传入覆盖。
+    """
     s = settings or __import__("app.config",
                                fromlist=["Settings"]).Settings.load()
     out_dir = _out_dir(photo_id)
@@ -83,9 +86,9 @@ def narrate(photo_id: str, settings=None) -> dict:
         result["degraded"] = True
         return result
     result["script"] = script
-    voice = s.tts_voice
-    ok = _tts(s).synthesize(script, voice, out_dir / "narration.wav")
+    used_voice = voice or s.tts_voice
+    ok = _tts(s).synthesize(script, used_voice, out_dir / "narration.wav")
     result["audio"] = ok
-    result["voice"] = voice
+    result["voice"] = used_voice
     result["degraded"] = not ok
     return result

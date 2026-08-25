@@ -29,15 +29,30 @@
 {% set narration = namespace(exists=False) %}
 {% if has_narration %}
 <section class="narration">
-  <h2>粤语讲解 <small class="hint">（{{ tts_voice }}）</small></h2>
+  <h2>粤语讲解 <small class="hint">（当前：{{ tts_voice }}）</small></h2>
   {% if has_video %}
   <video controls preload="none" width="480" src="/media/{{ pid }}/narration.mp4"></video>
   <p class="hint">AI 口型视频（预生成）</p>
   {% else %}
-  <audio controls preload="none" src="/media/{{ pid }}/narration.wav"></audio>
+  <audio id="narration-audio" controls preload="none"
+         src="/media/{{ pid }}/narration.wav"></audio>
   {% endif %}
-</section>
+{% else %}
+<section class="narration">
+  <h2>粤语讲解</h2>
 {% endif %}
+  <div class="chiprow">
+    <select id="tts-voice" aria-label="选择音色">
+      {% for vid, label in voices.items() %}
+      <option value="{{ vid }}" {{ 'selected' if vid == tts_voice }}>
+        {{ label }}（{{ vid }}）</option>
+      {% endfor %}
+    </select>
+    <button id="tts-gen" data-pid="{{ pid }}">
+      {{ '换音色重新合成' if has_narration else '生成讲解音频' }}</button>
+    <span id="tts-status" class="hint"></span>
+  </div>
+</section>
 
 <section>
   <h2>OCR 提取文字</h2>

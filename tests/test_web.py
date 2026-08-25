@@ -77,3 +77,42 @@ def test_create_copy_maps_errors(monkeypatch):
     monkeypatch.setattr(wm.creator, "create", missing)
     assert c.post("/api/create/nope",
                   json={"type": "postcard"}).status_code == 404
+
+
+def test_narrate_api_voice_override_and_errors(monkeypatch):
+    captured = {}
+
+    def fake_narrate(pid, settings=None, voice=None):
+        captured.update(pid=pid, voice=voice)
+        return {"audio": True, "photo_id": pid}
+
+    monkeypatch.setattr(wm.narrator, "narrate", fake_narrate)
+    c = _client(monkeypatch)
+
+    r = c.post("/api/narrate/sample_a", json={"voice": "longanyue"})
+    assert r.status_code == 200
+    assert captured["pid"] == "sample_a" and captured["voice"] == "longanyue"
+
+    r2 = c.post("/api/narrate/sample_a", json={"voice": "不存在的音色"})
+    assert r2.status_code == 400
+
+    r3 = c.post("/api/narrate/sample_a", json={})
+    assert r3.status_code == 200 and captured["voice"] is None
+
+
+def test_detail_page_lists_cantonese_voices(monkeypatch):
+    from app.infra.tts import VOICES
+    monkeypatch.setattr(
+        wm, "_photos_all", lambda: [
+            {"photo_id": "sample_a", "title": "骑楼A", "year": "1930",
+             "location": "广州"}])
+    monkeypatch.setattr(wm, "_get_photo",
+                        lambda pid, settings=None: {
+                            "photo_id": pid, "title": "骑楼A",
+                            "caption": "c", "has_colorized": 0})
+    monkeypatch.setattr(wm, "_health_flags",
+                        lambda: {"milvus": True})
+    c = _client(monkeypatch)
+    body = c.get("/photo/sample_a").text
+    for vid in VOICES:
+        assert vid in body

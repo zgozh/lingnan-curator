@@ -13,6 +13,13 @@ logger = logging.getLogger(__name__)
 _MODEL = "cosyvoice-v2"
 _FMT = "WAV_22050HZ_MONO_16BIT"
 
+# 实测可用的 CosyVoice 粤语发音人（前端音色选择器数据源）
+VOICES: dict[str, str] = {
+    "longjiayi_v2": "知性粤语女",
+    "longtao_v2": "积极粤语女",
+    "longanyue": "欢脱粤语男",
+}
+
 def _new_synthesizer(model: str, voice: str, audio_format: str):
     """seam：测试替换；真实实现延迟 import（无 SDK/无 key 不炸 import）。"""
     from dashscope.audio.tts_v2 import AudioFormat, SpeechSynthesizer
