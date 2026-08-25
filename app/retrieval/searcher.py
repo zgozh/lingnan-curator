@@ -49,7 +49,7 @@ def text_channel(client, collection: str, query: str, embedder, limit: int) -> l
         ranker=WeightedRanker(*_TEXT_WEIGHTS),
         limit=limit, output_fields=_OUTPUT_FIELDS,
     )
-    return [_row_to_dict(r) for r in rows]
+    return [_row_to_dict(r) for r in _flatten(rows)]
 
 
 def clip_channel(client, collection: str, image_path, embedder, limit: int) -> list[dict]:
@@ -60,8 +60,18 @@ def clip_channel(client, collection: str, image_path, embedder, limit: int) -> l
         param={"metric_type": "COSINE"}, limit=limit,
         output_fields=_OUTPUT_FIELDS,
     )
-    flat = rows[0] if rows and isinstance(rows[0], list) else rows
-    return [_row_to_dict(r) for r in flat]
+    return [_row_to_dict(r) for r in _flatten(rows)]
+
+
+def _flatten(rows) -> list:
+    """pymilvus 返回可能是 SearchResult[HybridHits[dict]] 容器套容器。"""
+    try:
+        first = rows[0]
+        if hasattr(first, "__iter__") and not isinstance(first, dict):
+            return list(first)
+    except Exception:  # noqa: BLE001 —— 结构探测失败按平铺处理
+        pass
+    return list(rows)
 
 
 def _row_to_dict(row) -> dict:

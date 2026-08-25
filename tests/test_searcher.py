@@ -37,6 +37,26 @@ def _hit(pid, score):
                        "caption": ""}}
 
 
+class FakeHybridHits:
+    """模拟 pymilvus SearchResult[HybridHits]：容器套可迭代容器。"""
+
+    def __init__(self, hits):
+        self._hits = hits
+
+    def __iter__(self):
+        return iter(self._hits)
+
+    def __len__(self):
+        return 1
+
+
+def test_hybrid_rows_container_is_flattened():
+    c = FakeClient()
+    wrapped = [FakeHybridHits([_hit("a", 0.9), _hit("b", 0.8)])]
+    out = se._flatten(wrapped)
+    assert [r["id"] for r in out] == ["a", "b"]  # 摊平后仍为原始命中 dict
+
+
 def test_text_channel_uses_weighted_ranker():
     c = FakeClient(text_hits=[_hit("a", 0.9), _hit("b", 0.8)])
     emb = FakeEmb()
