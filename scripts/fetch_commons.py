@@ -182,8 +182,15 @@ def main(argv=None) -> None:
 
     if new_meta:
         exists = META.exists()
+        fields = _META_FIELDS
+        if exists:
+            with open(META, encoding="utf-8-sig", newline="") as f:
+                header = next(csv.reader(f), None)
+            # 追加必须对齐现有表头列序，否则 DictWriter 会把值写串列
+            if header and set(header) == set(_META_FIELDS):
+                fields = header
         with open(META, "a", encoding="utf-8", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=_META_FIELDS)
+            w = csv.DictWriter(f, fieldnames=fields)
             if not exists:
                 w.writeheader()
             w.writerows(new_meta)

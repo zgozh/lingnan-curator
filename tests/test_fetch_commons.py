@@ -36,3 +36,37 @@ def test_dedup_against_existing(tmp_path):
         encoding="utf-8")
     from pathlib import Path
     assert "gz_1" in fc._existing_ids(Path(csv_path))
+
+
+def test_append_aligns_existing_header_order(tmp_path, monkeypatch):
+    """已有 meta.csv 列序与脚本默认不同时，追加行必须对齐现有表头。"""
+    import csv
+    meta = tmp_path / "meta.csv"
+    meta.write_text(
+        "photo_id,title,year,location,source_url,license\n"
+        "sample_a,冒烟A,1930,广州,local-smoke,TEMP-DEMO\n",
+        encoding="utf-8")
+    monkeypatch.setattr(fc, "RAW", tmp_path)
+    monkeypatch.setattr(fc, "META", meta)
+
+    info = {"title": "File:Foo Bar.jpg", "thumb": "https://x/t.jpg",
+            "width": 1600, "mime": "image/jpeg", "license": "Public domain",
+            "date": "1930-01-01",
+            "page": "https://commons.wikimedia.org/wiki/File:Foo_Bar.jpg"}
+    monkeypatch.setattr(fc, "_file_titles",
+                        lambda opener, cat, search, limit: iter(["File:Foo Bar.jpg"]))
+    monkeypatch.setattr(fc, "_info", lambda opener, title, width: info)
+    monkeypatch.setattr(fc, "_download",
+                        lambda opener, url, dest: (dest.write_bytes(b"x" * 20480) or True))
+
+    fc.main(["--category", "Historical_images_of_Guangzhou",
+             "--limit", "5", "--location", "广州"])
+
+    with open(meta, encoding="utf-8-sig", newline="") as f:
+        rows = list(csv.DictReader(f))
+    added = [r for r in rows if r["photo_id"] != "sample_a"]
+    assert len(added) == 1
+    # 列错位回归：license 列必须仍是许可名，source_url 必须是链接
+    assert added[0]["license"] == "Public domain"
+    assert added[0]["source_url"].startswith("https://commons.wikimedia.org/")
+    assert added[0]["title"] == "Foo Bar.jpg"
