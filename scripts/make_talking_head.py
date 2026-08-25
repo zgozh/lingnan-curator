@@ -47,18 +47,23 @@ def main() -> None:
            "--still", "--preprocess", "full"]
 
     # SadTalker 的 save_video_with_watermark 用裸 `ffmpeg` 命令混流；
-    # 系统未装 ffmpeg 时借用 st venv 里 imageio-ffmpeg 自带的静态二进制。
+    # 系统未装 ffmpeg 时借用 st venv 里 imageio-ffmpeg 的静态二进制。
+    # 注意：其文件名带版本号(ffmpeg-win64-*.exe)，需复制为 ffmpeg.exe 垫片。
     env: dict[str, str] | None = None
     try:
         probe = subprocess.run(
-            [str(ST_PY), "-c",
-             "import imageio_ffmpeg,pathlib;"
-             "print(pathlib.Path(imageio_ffmpeg.get_ffmpeg_exe()).parent)"],
+            [str(ST_PY), "-c", "import imageio_ffmpeg;"
+                               "print(imageio_ffmpeg.get_ffmpeg_exe())"],
             capture_output=True, text=True, check=True)
-        ff_dir = probe.stdout.strip().splitlines()[-1]
+        ff_exe = Path(probe.stdout.strip().splitlines()[-1])
+        shim_dir = SADTALKER / "ffmpeg_shim"
+        shim_dir.mkdir(exist_ok=True)
+        shim = shim_dir / "ffmpeg.exe"
+        if not shim.exists():
+            shutil.copyfile(ff_exe, shim)
         env = {**os.environ,
-               "PATH": ff_dir + os.pathsep + os.environ.get("PATH", "")}
-        print("[ffmpeg-borrow]", ff_dir)
+               "PATH": str(shim_dir) + os.pathsep + os.environ.get("PATH", "")}
+        print("[ffmpeg-borrow]", shim)
     except Exception as exc:  # noqa: BLE001 —— 拿不到就按原样跑
         print("[ffmpeg-borrow] skip:", exc)
 
