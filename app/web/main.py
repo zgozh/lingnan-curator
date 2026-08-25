@@ -126,6 +126,7 @@ def create_app() -> FastAPI:
              "has_colorized": bool(row.get("has_colorized"))
              and (base / "colorized.jpg").exists(),
              "has_narration": (base / "narration.wav").exists(),
+             "has_video": (base / "narration.mp4").exists(),
              "tts_voice": _settings().tts_voice},
         )
 

@@ -30,7 +30,12 @@
 {% if has_narration %}
 <section class="narration">
   <h2>粤语讲解 <small class="hint">（{{ tts_voice }}）</small></h2>
+  {% if has_video %}
+  <video controls preload="none" width="480" src="/media/{{ pid }}/narration.mp4"></video>
+  <p class="hint">AI 口型视频（预生成）</p>
+  {% else %}
   <audio controls preload="none" src="/media/{{ pid }}/narration.wav"></audio>
+  {% endif %}
 </section>
 {% endif %}
 

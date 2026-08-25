@@ -70,3 +70,27 @@ def test_no_answered_rows_skips_ragas(monkeypatch, tmp_path):
     out = tmp_path / "report.json"
     cli.cmd_eval_impl(qp, out)
     assert not called  # 无可评样本则不调 RAGAS
+
+
+def test_contexts_assembled_from_photo_ids(monkeypatch, tmp_path):
+    qp = _write_questions(tmp_path, [
+        {"qid": "q1", "question": "骑楼？", "refusal": False},
+    ])
+    _patch_docent(monkeypatch, {
+        "骑楼？": {"answer": "有骑楼", "photo_ids": ["sample_a"],
+                   "refused": False},
+    })
+    monkeypatch.setattr(
+        cli, "_contexts",
+        lambda pids, settings=None:
+            ["《骑楼街景》（1930）·广州：1920年代骑楼"]
+            if pids == ["sample_a"] else [])
+    seen = {}
+
+    def fake_ragas(rows, settings):
+        seen["rows"] = rows
+        return {"faithfulness": 0.9, "answer_relevancy": 0.8}
+
+    monkeypatch.setattr(cli, "_run_ragas", fake_ragas)
+    cli.cmd_eval_impl(qp, tmp_path / "report.json")
+    assert seen["rows"][0]["contexts"] == ["《骑楼街景》（1930）·广州：1920年代骑楼"]

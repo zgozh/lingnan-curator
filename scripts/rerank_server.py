@@ -23,19 +23,22 @@ _SUFFIX = '<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n'
 
 _model = None
 _tokenizer = None
+_device = None
 
 
 def _load():
-    global _model, _tokenizer
+    global _model, _tokenizer, _device
     if _model is not None:
         return
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
+    _device = "cuda" if torch.cuda.is_available() else "cpu"
+    dtype = torch.float16 if _device == "cuda" else torch.float32
     _tokenizer = AutoTokenizer.from_pretrained(str(MODEL_DIR))
     _model = AutoModelForCausalLM.from_pretrained(
-        str(MODEL_DIR), torch_dtype=torch.float16).cuda().eval()
-    logger.info("rerank 模型加载完成: %s", MODEL_DIR)
+        str(MODEL_DIR), torch_dtype=dtype).to(_device).eval()
+    logger.info("rerank 模型加载完成: %s device=%s", MODEL_DIR, _device)
 
 
 def _score(query: str, doc: str) -> float:
@@ -50,7 +53,7 @@ def _score(query: str, doc: str) -> float:
     yes_id = _tokenizer.convert_tokens_to_ids("yes")
     no_id = _tokenizer.convert_tokens_to_ids("no")
     two = torch.tensor([logits[0, yes_id], logits[0, no_id]])
-    return torch.softmax(two, dim=0)[0].item()
+    return torch.softmax(two.float(), dim=0)[0].item()
 
 
 app = FastAPI(title="qwen3-rerank")

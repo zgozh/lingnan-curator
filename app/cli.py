@@ -67,6 +67,32 @@ def _run_ragas(rows: list[dict], settings=None) -> dict:
     return run_ragas(rows, settings)
 
 
+def _contexts(photo_ids: list[str], settings=None) -> list[str]:
+    """seam：按 photo_ids 取证据文本（著录全字段），供 RAGAS 判卷。"""
+    if not photo_ids:
+        return []
+    from app.infra.milvus_store import get_client
+
+    s = settings or __import__("app.config",
+                               fromlist=["Settings"]).Settings.load()
+    client = get_client(s)
+    out = []
+    for pid in photo_ids[:5]:
+        rows = client.query(
+            collection_name=s.collection,
+            filter=f'photo_id == "{pid}"',
+            output_fields=["title", "year", "location", "caption"], limit=1)
+        if rows:
+            r = rows[0]
+            meta = f"《{r.get('title')}》"
+            if r.get("year"):
+                meta += f"（{r['year']}）"
+            if r.get("location"):
+                meta += f"·{r['location']}"
+            out.append(f"{meta}：{r.get('caption')}")
+    return out
+
+
 def cmd_eval_impl(questions_path, report_path, settings=None) -> bool:
     """F8：批量问答 → refused_accuracy + RAGAS 指标 → 报告落盘。
 
@@ -84,7 +110,7 @@ def cmd_eval_impl(questions_path, report_path, settings=None) -> bool:
         res = _ask(q["question"], settings)
         entry = {"qid": q["qid"], "question": q["question"],
                  "answer": res.get("answer", ""),
-                 "contexts": res.get("contexts", []),
+                 "contexts": _contexts(res.get("photo_ids") or [], settings),
                  "refused": res.get("refused", False)}
         (refusals if q.get("refusal") else answered).append(entry)
 
