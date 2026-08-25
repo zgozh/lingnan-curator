@@ -1,7 +1,23 @@
 # PROGRESS —— lingnan-curator
 
 ## 当前阶段
-**阶段 4 完成（W1 全绿）**：Task 1~10 全部完成（TDD 53 tests）。e2e 冒烟报告 OK=14 / DEGRADED=1 / FAILED=0（唯一降级为纯画面照 OCR 无文字，属设计内），Milvus 落库 3/3。下一阶段：W2 混合检索 + 三 Agent + Web 展馆最小闭环。
+**W2 完成（检索+三 Agent+展馆最小闭环）**：F2/F3/F4/F5/F7 全部落地，TDD 89 tests 绿；真实冒烟 SMOKE PASS——搜索"骑楼"命中 sample_a（场景1）、超范围问题 SSE 明确拒答（场景2后半）。服务可用 `uv run uvicorn app.web.main:app --port 8301` 体验。下一阶段：W3 口播 F6 + RAGAS F8 + 全量素材入库。
+
+## W2 执行记录（2026-08-24）
+- T1 ✅ 644735e 检索基元：文本通道 WeightedRanker(0.8,0.2) + CLIP 通道 → RRF(k=60) 融合 → 归一化；CLIP 失败降级纯文本
+- T2 ✅ 6f913bf rerank 客户端四态降级（成功/超时/500/未配置→None）
+- T3 ✅ e4fd5d4+5247712 检索门面：精排接入 + 断崖截断（<peak×0.35 或 >12 条截断）
+- T4 ✅ e9400b4 LLM 文本客户端 chat/stream_chat/json_mode；extract_json 上移 app/utils/json_utils
+- T5 ✅ 77d24dd 讲解员 Agent：防幻觉三道闸（空检索拒答/提示词约束/事后校验引用）+ SSE 流式
+- T6 ✅ d2a12bf 策展人（主题→展览 JSON，过滤池外 id）+ 文创（三类型，400/404 语义）
+- T7 ✅ 838085d Web 展馆：照片墙/详情对比滑块/搜索/问答 SSE/专题展 + Milvus 未连中文横幅
+- T8 ✅ b177506 真实冒烟 SMOKE PASS：pymilvus SearchResult[HybridHits] 容器摊平修复后，
+  /search 骑楼命中 sample_a、/photo 详情含 OCR、超范围 ask refused=true；脚本 scripts/smoke_web.py
+
+### W2 备注
+- Agent 编排暂用轻量函数+seam（未上 LangGraph 图结构）：当前流程为线性两步，YAGNI；W3 若引入多步条件路由再评估迁移
+- qwen3-rerank 服务本体 W3 部署；当前 RERANK_BASE_URL 空 → 全链路走 degraded={'rerank'} 直通路径，验收标准「停精排仍可用」已由测试覆盖
+- 中文 Windows 控制台打印 emoji 会 UnicodeEncodeError，脚本输出用 [OK]/[NG]
 
 ## W1 执行记录
 - [2026-08-24] Task1 ✅ ec80256 骨架+Settings+PhotoRecord/IngestReport
