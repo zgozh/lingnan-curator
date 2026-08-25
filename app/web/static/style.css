@@ -40,9 +40,11 @@ button,.chip { padding:10px 18px; border:none; border-radius:6px; cursor:pointer
 #chat-log { min-height:120px; }
 .compare img { width:100%; max-width:640px; border-radius:10px; display:block; }
 .slider { position:relative; max-width:640px; }
-.layer { position:relative; }
-.layer.top { position:absolute; inset:0; clip-path:inset(0 0 0 50%); height:100%; object-fit:contain; }
-input[type=range] { width:100%; margin-top:8px; }
+.slider img { display:block; }
+.layer.base { width:100%; border-radius:10px; }  /* 在流内撑起高度 */
+.layer.top { position:absolute; top:0; left:0; width:100%;
+  clip-path:inset(0 0 0 50%); pointer-events:none; border-radius:10px; }
+input[type=range] { width:100%; margin-top:8px; position:relative; z-index:3; }
 pre.ocr { background:#fff; border:1px dashed var(--line); padding:14px;
   border-radius:8px; white-space:pre-wrap; }
 .copy { background:#fff; border:1px solid var(--line); border-radius:8px;

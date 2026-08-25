@@ -116,3 +116,27 @@ def test_detail_page_lists_cantonese_voices(monkeypatch):
     body = c.get("/photo/sample_a").text
     for vid in VOICES:
         assert vid in body
+
+
+def test_detail_renders_chinese_creator_labels(monkeypatch):
+    """文创三个类型按钮应为中文标签（非英文 postcard/slogan/moments）。"""
+    monkeypatch.setattr(wm, "_get_photo",
+                        lambda pid, settings=None: {
+                            "photo_id": pid, "title": "骑楼A",
+                            "caption": "c", "has_colorized": 0})
+    c = _client(monkeypatch)
+    body = c.get("/photo/sample_a").text
+    for label in ("明信片", "标语", "朋友圈文案"):
+        assert label in body
+    assert "postcard" in body  # 仍以 data-type 属性存在，供前端识别
+
+
+def test_detail_always_has_narration_audio_element(monkeypatch):
+    """即便已生成音频元素，未合成时也须渲染 audio 节点（免刷新热更新）。"""
+    monkeypatch.setattr(wm, "_get_photo",
+                        lambda pid, settings=None: {
+                            "photo_id": pid, "title": "骑楼A",
+                            "caption": "c", "has_colorized": 0})
+    c = _client(monkeypatch)
+    body = c.get("/photo/sample_a").text
+    assert 'id="narration-audio"' in body

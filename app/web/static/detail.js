@@ -52,13 +52,19 @@ if (gen) {
       }
       const data = await resp.json();
       const audio = document.getElementById('narration-audio');
-      if (audio && !data.has_video) {
+      const hasVideoNode = !!document.querySelector('section.narration video');
+      if (audio) {
         audio.src = `/media/${gen.dataset.pid}/narration.wav?v=${Date.now()}`;
-        audio.hidden = false;
-        status.textContent = '已完成，点击播放试听';
-      } else {
-        status.textContent = '音频已更新；口播视频需重跑预生成后刷新页面';
+        audio.hidden = hasVideoNode;
+        if (!hasVideoNode) {
+          audio.load();
+          audio.play().catch(() => {});
+        }
       }
+      gen.textContent = '换音色重新合成';
+      status.textContent = hasVideoNode
+        ? '音频已更新；口播视频需重跑预生成后刷新页面'
+        : '已完成，正在播放试听';
     } catch {
       status.textContent = '网络异常，请重试';
     } finally {

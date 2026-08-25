@@ -27,20 +27,15 @@
 </section>
 
 {% set narration = namespace(exists=False) %}
-{% if has_narration %}
 <section class="narration">
   <h2>粤语讲解 <small class="hint">（当前：{{ tts_voice }}）</small></h2>
   {% if has_video %}
   <video controls preload="none" width="480" src="/media/{{ pid }}/narration.mp4"></video>
   <p class="hint">AI 口型视频（预生成）</p>
-  {% else %}
-  <audio id="narration-audio" controls preload="none"
-         src="/media/{{ pid }}/narration.wav"></audio>
   {% endif %}
-{% else %}
-<section class="narration">
-  <h2>粤语讲解</h2>
-{% endif %}
+  <audio id="narration-audio" controls preload="none"
+    {% if has_narration and not has_video %}src="/media/{{ pid }}/narration.wav"{% endif %}
+    {% if not has_narration or has_video %}hidden{% endif %}></audio>
   <div class="chiprow">
     <select id="tts-voice" aria-label="选择音色">
       {% for vid, label in voices.items() %}
@@ -62,8 +57,9 @@
 <section>
   <h2>文创生成</h2>
   <div class="chiprow">
-    {% for t in ['postcard', 'slogan', 'moments'] %}
-    <button class="chip" data-pid="{{ pid }}" data-type="{{ t }}">{{ t }}</button>
+    {% for t, label in [('postcard', '明信片'), ('slogan', '标语'),
+                        ('moments', '朋友圈文案')] %}
+    <button class="chip" data-pid="{{ pid }}" data-type="{{ t }}">{{ label }}</button>
     {% endfor %}
   </div>
   <div id="copy-out" class="copy"></div>
