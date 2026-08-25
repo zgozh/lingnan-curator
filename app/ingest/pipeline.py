@@ -91,7 +91,7 @@ def run_pipeline(
                 )
                 dense, sparse = emb.texts(text_for_index)
                 clip = emb.image(work)
-                upsert_photo(client, rec, dense=dense, sparse=sparse,
+                upsert_photo(client, rec, dense=dense[0], sparse=sparse[0],
                              clip=clip, collection=settings.collection)
                 report.add(f"{rec.photo_id}/store", StepStatus.OK)
             except Exception as exc:  # noqa: BLE001 —— 单张存储失败不拖垮批次

@@ -62,6 +62,10 @@ def test_happy_path_all_ok(tmp_path, monkeypatch):
     assert all(s == StepStatus.OK for s in statuses.values())
     assert calls[0][0].has_colorized is True and calls[0][0].restored is True
     assert calls[0][0].caption == "描述文字"
+    # 批形状输入必须解包成单行向量再入库
+    _, kw = calls[0]
+    assert len(kw["dense"]) == 1024 and isinstance(kw["dense"][0], float)
+    assert isinstance(kw["sparse"], dict)
     json.loads(rep_path.read_text(encoding="utf-8"))  # 报告可按 UTF-8 解析
 
 
