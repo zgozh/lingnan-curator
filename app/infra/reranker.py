@@ -9,7 +9,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-_TIMEOUT = 5.0
+_TIMEOUT = 15.0  # 全量语料候选增多 + 与其他 GPU 任务共存时的安全余量
 
 
 def _http(timeout: float = _TIMEOUT) -> httpx.Client:

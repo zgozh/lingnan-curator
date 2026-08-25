@@ -41,19 +41,22 @@ def _load():
     logger.info("rerank 模型加载完成: %s device=%s", MODEL_DIR, _device)
 
 
-def _score(query: str, doc: str) -> float:
-    """yes-token 的 softmax 概率即相关度。"""
+def _score_batch(query: str, docs: list[str]) -> list[float]:
+    """整批一次前向：padding 对齐后取末 token yes/no softmax。"""
     import torch
 
-    text = f"{_PREFIX}<Instruction>: 无\n<Query>: {query}\n<Document>: {doc}{_SUFFIX}"
-    inputs = _tokenizer([text], return_tensors="pt", truncation=True,
-                        max_length=2048).to(_model.device)
+    texts = [
+        f"{_PREFIX}<Instruction>: 无\n<Query>: {query}\n"
+        f"<Document>: {d}{_SUFFIX}" for d in docs
+    ]
+    inputs = _tokenizer(texts, return_tensors="pt", padding=True,
+                        truncation=True, max_length=2048).to(_model.device)
     with torch.no_grad():
         logits = _model(**inputs).logits[:, -1, :]
     yes_id = _tokenizer.convert_tokens_to_ids("yes")
     no_id = _tokenizer.convert_tokens_to_ids("no")
-    two = torch.tensor([logits[0, yes_id], logits[0, no_id]])
-    return torch.softmax(two.float(), dim=0)[0].item()
+    two = torch.stack([logits[:, yes_id], logits[:, no_id]], dim=1).float()
+    return torch.softmax(two, dim=1)[:, 0].tolist()
 
 
 app = FastAPI(title="qwen3-rerank")
@@ -70,8 +73,9 @@ def health():
 
 @app.post("/rerank")
 def rerank(body: dict):
-    _load()
     query = str(body.get("query") or "")
     docs = [str(d) for d in (body.get("documents") or [])]
-    scores = [_score(query, d) for d in docs]
-    return {"scores": scores}
+    if not docs:
+        return {"scores": []}
+    _load()
+    return {"scores": _score_batch(query, docs)}
