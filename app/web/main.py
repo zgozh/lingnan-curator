@@ -124,7 +124,9 @@ def create_app() -> FastAPI:
             {"p": row, "pid": photo_id,
              "has_restored": (base / "restored.jpg").exists(),
              "has_colorized": bool(row.get("has_colorized"))
-             and (base / "colorized.jpg").exists()},
+             and (base / "colorized.jpg").exists(),
+             "has_narration": (base / "narration.wav").exists(),
+             "tts_voice": _settings().tts_voice},
         )
 
     @app.get("/exhibit")

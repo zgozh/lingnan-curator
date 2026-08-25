@@ -40,6 +40,19 @@ def cmd_ingest(args) -> None:
         print(f"  [{i.status.name}] {i.step}: {i.detail}")
 
 
+def cmd_narrate(args) -> None:
+    """F6 口播预生成：讲解词→TTS 音频（SadTalker 视频待 T4 就绪后接入）。"""
+    from app.agents.narrator import narrate
+
+    result = narrate(args.pid)
+    if result.get("error"):
+        raise SystemExit(f"narrate 失败: {result['error']}")
+    state = "OK" if result["audio"] else "DEGRADED(无音频)"
+    print(f"[{state}] {args.pid} voice={result.get('voice')} "
+          f"-> data/processed/{args.pid}/narration.wav")
+    print(f"讲解词：{result.get('script', '')[:80]}…")
+
+
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="lingnan", description="岭南非遗 AI 策展人")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -49,7 +62,11 @@ def main(argv: list[str] | None = None) -> None:
     ig.add_argument("--limit", type=int, default=0, help="只处理前 N 张(0=全部)")
     ig.set_defaults(func=cmd_ingest)
 
-    for name in ("serve", "narrate", "eval"):
+    na = sub.add_parser("narrate", help="口播预生成：讲解词→粤语 TTS 音频")
+    na.add_argument("--pid", required=True, help="photo_id")
+    na.set_defaults(func=cmd_narrate)
+
+    for name in ("serve", "eval"):
         sp = sub.add_parser(name)
         sp.set_defaults(func=_not_impl(name))
 

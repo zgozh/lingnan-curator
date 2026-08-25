@@ -26,6 +26,14 @@
   <p>{{ p.caption or '（暂无）' }}</p>
 </section>
 
+{% set narration = namespace(exists=False) %}
+{% if has_narration %}
+<section class="narration">
+  <h2>粤语讲解 <small class="hint">（{{ tts_voice }}）</small></h2>
+  <audio controls preload="none" src="/media/{{ pid }}/narration.wav"></audio>
+</section>
+{% endif %}
+
 <section>
   <h2>OCR 提取文字</h2>
   <pre class="ocr">{% if p.ocr_text %}{{ p.ocr_text }}{% else %}（本张无识别文字）{% endif %}</pre>
