@@ -28,15 +28,11 @@ def fallback_caption(record: PhotoRecord) -> Caption:
 
 
 def extract_json(text: str) -> dict | None:
-    """从可能带围栏/说明词的输出里抠出第一个 JSON 对象；失败返回 None。"""
-    try:
-        start, end = text.find("{"), text.rfind("}")
-        if start < 0 or end <= start:
-            return None
-        obj = json.loads(text[start : end + 1])
-        return obj if isinstance(obj, dict) else None
-    except (ValueError, TypeError):
-        return None
+    """兼容壳：公共实现已上移 app.utils.json_utils。"""
+    from app.utils.json_utils import extract_json as _impl
+
+    obj = _impl(text)
+    return obj if isinstance(obj, dict) else None
 
 
 def caption_photo(

@@ -14,6 +14,72 @@ CAPTION_SYSTEM = (
 )
 
 _vlm: "DashScopeVLM | None" = None
+_llm: "DashScopeLLM | None" = None
+
+
+class DashScopeLLM:
+    """文本对话客户端（qwen-plus 等）；供三 Agent 使用。"""
+
+    def __init__(self, settings: Settings | None = None):
+        self.settings = settings or Settings.load()
+        from openai import OpenAI
+
+        self._sdk = OpenAI(
+            api_key=self.settings.dashscope_api_key,
+            base_url=self.settings.dashscope_base_url,
+        )
+
+    def _create(self, messages: list[dict], json_mode: bool = False,
+                stream: bool = False, timeout: float = 60):
+        kwargs: dict = {
+            "model": self.settings.llm_model,
+            "messages": messages,
+            "timeout": timeout,
+        }
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+        if stream:
+            kwargs["stream"] = True
+        return self._sdk.chat.completions.create(**kwargs)
+
+
+def chat(messages: list[dict], settings: Settings | None = None,
+         json_mode: bool = False, client_factory=None) -> str:
+    """同步对话，返回全文。client_factory 仅供测试注入 fake SDK 容器。"""
+    s = settings or Settings.load()
+    if client_factory is not None:
+        comp = client_factory(api_key="x", base_url="x").chat
+        kwargs: dict = {"model": s.llm_model}
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+        resp = comp.create(messages=messages, timeout=60, **kwargs)
+    else:
+        resp = get_llm(s)._create(messages, json_mode=json_mode)
+    return resp.choices[0].message.content or ""
+
+
+def stream_chat(messages: list[dict], settings: Settings | None = None,
+                client_factory=None):
+    """流式对话：逐段 yield 增量文本（SSE 用）。"""
+    s = settings or Settings.load()
+    if client_factory is not None:
+        comp = client_factory(api_key="x", base_url="x").chat
+        chunks = comp.create(messages=messages, timeout=60,
+                             model=s.llm_model, stream=True)
+    else:
+        chunks = get_llm(s)._create(messages, stream=True)
+    for chunk in chunks:
+        delta = chunk.choices[0].delta
+        text = getattr(delta, "content", None)
+        if text:
+            yield text
+
+
+def get_llm(settings: Settings | None = None) -> DashScopeLLM:
+    global _llm
+    if _llm is None:
+        _llm = DashScopeLLM(settings)
+    return _llm
 
 
 class DashScopeVLM:
@@ -55,5 +121,6 @@ def get_vlm(settings: Settings | None = None) -> DashScopeVLM:
 
 def reset_clients() -> None:
     """测试与配置热更用。"""
-    global _vlm
+    global _vlm, _llm
     _vlm = None
+    _llm = None
