@@ -117,9 +117,13 @@ def cmd_eval_impl(questions_path, report_path, settings=None) -> bool:
     refused_correct = sum(
         1 for e in refusals if e["refused"]) if refusals else 0
     refused_accuracy = (refused_correct / len(refusals)) if refusals else None
+    # 防刷分指标：应答题里被正确回答的比例（过度拒答会拉低它）
+    answer_rate = (sum(1 for e in answered if not e["refused"])
+                   / len(answered)) if answered else None
 
-    ragas_scores = (_run_ragas(answered, settings)
-                    if answered else {})
+    ragas_rows = [e for e in answered if not e["refused"]]
+    ragas_scores = (_run_ragas(ragas_rows, settings)
+                    if ragas_rows else {})
     faith = float(ragas_scores.get("faithfulness", 0.0))
     relev = float(ragas_scores.get("answer_relevancy", 0.0))
     meets = (faith >= 0.80 and relev >= 0.75
@@ -130,6 +134,7 @@ def cmd_eval_impl(questions_path, report_path, settings=None) -> bool:
               "total": len(rows), "answered": len(answered),
               "refusals": len(refusals),
               "refused_accuracy": refused_accuracy,
+              "answer_rate": answer_rate,
               **ragas_scores, "meets_threshold": meets}
     out = _Path(report_path)
     out.parent.mkdir(parents=True, exist_ok=True)

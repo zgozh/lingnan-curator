@@ -57,6 +57,51 @@ def test_report_flags_below_threshold(monkeypatch, tmp_path):
     assert rep["meets_threshold"] is False
 
 
+def test_answer_rate_reported(monkeypatch, tmp_path):
+    qp = _write_questions(tmp_path, [
+        {"qid": "q1", "question": "骑楼？", "refusal": False},
+        {"qid": "q2", "question": "年代？", "refusal": False},
+        {"qid": "q3", "question": "地铁？", "refusal": True},
+    ])
+    _patch_docent(monkeypatch, {
+        "骑楼？": {"answer": "有", "photo_ids": ["a"], "refused": False},
+        "年代？": {"answer": cli.REFUSE_TEXT if hasattr(cli, "REFUSE_TEXT")
+                   else "拒答", "photo_ids": [], "refused": True},
+        "地铁？": {"answer": "拒", "photo_ids": [], "refused": True},
+    })
+    monkeypatch.setattr(cli, "_run_ragas",
+                        lambda rows, settings: {"faithfulness": 1.0,
+                                                "answer_relevancy": 1.0})
+    out = tmp_path / "report.json"
+    cli.cmd_eval_impl(qp, out)
+    rep = json.loads(out.read_text(encoding="utf-8"))
+    assert rep["answer_rate"] == 0.5  # 应答 2 题只答上 1 题
+
+
+def test_wrong_refusals_excluded_from_ragas(monkeypatch, tmp_path):
+    """误拒题进 answer_rate 惩罚，但拒答话术不得污染 RAGAS 样本。"""
+    qp = _write_questions(tmp_path, [
+        {"qid": "q1", "question": "骑楼？", "refusal": False},
+        {"qid": "q2", "question": "年代？", "refusal": False},
+    ])
+    _patch_docent(monkeypatch, {
+        "骑楼？": {"answer": "有骑楼", "photo_ids": ["a"], "refused": False},
+        "年代？": {"answer": "抱歉超出范围", "photo_ids": [], "refused": True},
+    })
+    seen = {}
+
+    def fake_ragas(rows, settings):
+        seen["rows"] = rows
+        return {"faithfulness": 1.0, "answer_relevancy": 1.0}
+
+    monkeypatch.setattr(cli, "_run_ragas", fake_ragas)
+    out = tmp_path / "report.json"
+    cli.cmd_eval_impl(qp, out)
+    assert len(seen["rows"]) == 1  # 只喂真回答
+    rep = json.loads(out.read_text(encoding="utf-8"))
+    assert rep["answer_rate"] == 0.5
+
+
 def test_no_answered_rows_skips_ragas(monkeypatch, tmp_path):
     qp = _write_questions(tmp_path, [
         {"qid": "q1", "question": "地铁？", "refusal": True},
