@@ -19,6 +19,12 @@ class Settings:
     tts_provider: str = "dashscope"
     tts_voice: str = "longjiayi_v2"  # CosyVoice 粤语：知性女声（v2 可用）
     rerank_base_url: str = ""  # 空=跳过精排（降级直通）
+    # 叙事链各阶段模型（4 个叙事 Agent 分工：story/insight 各自模型，review/narration 同档）
+    story_model: str = "qwen-max"
+    narration_model: str = "qwen-plus"
+    review_model: str = "qwen-plus"
+    insight_model: str = "qwen-vl-max"
+    max_story_retry: int = 1
 
     @staticmethod
     def load(env_file: str | None = ".env") -> "Settings":
@@ -37,4 +43,9 @@ class Settings:
             tts_provider=os.getenv("TTS_PROVIDER", d.tts_provider),
             tts_voice=os.getenv("TTS_VOICE", d.tts_voice),
             rerank_base_url=os.getenv("RERANK_BASE_URL", d.rerank_base_url),
+            story_model=os.getenv("STORY_MODEL", d.story_model),
+            narration_model=os.getenv("NARRATION_MODEL", d.narration_model),
+            review_model=os.getenv("REVIEW_MODEL", d.review_model),
+            insight_model=os.getenv("INSIGHT_MODEL", d.insight_model),
+            max_story_retry=int(os.getenv("MAX_STORY_RETRY", d.max_story_retry)),
         )
