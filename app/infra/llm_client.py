@@ -30,9 +30,10 @@ class DashScopeLLM:
         )
 
     def _create(self, messages: list[dict], json_mode: bool = False,
-                stream: bool = False, timeout: float = 60, temperature=None):
+                stream: bool = False, timeout: float = 60, temperature=None,
+                model=None):
         kwargs: dict = {
-            "model": self.settings.llm_model,
+            "model": model or self.settings.llm_model,
             "messages": messages,
             "timeout": timeout,
         }
@@ -46,12 +47,13 @@ class DashScopeLLM:
 
 
 def chat(messages: list[dict], settings: Settings | None = None,
-         json_mode: bool = False, temperature=None, client_factory=None) -> str:
+         json_mode: bool = False, temperature=None, model=None,
+         client_factory=None) -> str:
     """同步对话，返回全文。client_factory 仅供测试注入 fake SDK 容器。"""
     s = settings or Settings.load()
     if client_factory is not None:
         comp = client_factory(api_key="x", base_url="x").chat
-        kwargs: dict = {"model": s.llm_model}
+        kwargs: dict = {"model": model or s.llm_model}
         if json_mode:
             kwargs["response_format"] = {"type": "json_object"}
         if temperature is not None:
@@ -59,23 +61,23 @@ def chat(messages: list[dict], settings: Settings | None = None,
         resp = comp.create(messages=messages, timeout=60, **kwargs)
     else:
         resp = get_llm(s)._create(messages, json_mode=json_mode,
-                                  temperature=temperature)
+                                  temperature=temperature, model=model)
     return resp.choices[0].message.content or ""
 
 
 def stream_chat(messages: list[dict], settings: Settings | None = None,
-                temperature=None, client_factory=None):
+                temperature=None, model=None, client_factory=None):
     """流式对话：逐段 yield 增量文本（SSE 用）。"""
     s = settings or Settings.load()
     if client_factory is not None:
         comp = client_factory(api_key="x", base_url="x").chat
-        kwargs: dict = {"model": s.llm_model, "stream": True}
+        kwargs: dict = {"model": model or s.llm_model, "stream": True}
         if temperature is not None:
             kwargs["temperature"] = temperature
         chunks = comp.create(messages=messages, timeout=60, **kwargs)
     else:
         chunks = get_llm(s)._create(messages, stream=True,
-                                    temperature=temperature)
+                                    temperature=temperature, model=model)
     for chunk in chunks:
         delta = chunk.choices[0].delta
         text = getattr(delta, "content", None)
@@ -102,10 +104,11 @@ class DashScopeVLM:
         )
 
     def describe(self, image_path: Path, user_prompt: str,
-                 system_prompt: str | None = None, json_mode: bool = False) -> str:
+                 system_prompt: str | None = None, json_mode: bool = False,
+                 model=None) -> str:
         b64 = base64.b64encode(Path(image_path).read_bytes()).decode("ascii")
         kwargs: dict = {
-            "model": self.settings.vlm_model,
+            "model": model or self.settings.vlm_model,
             "messages": [
                 {"role": "system", "content": system_prompt or CAPTION_SYSTEM},
                 {

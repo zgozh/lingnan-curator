@@ -5,6 +5,7 @@ degraded Insight（source="metadata"），绝不向上抛异常、不打垮叙�
 """
 from pathlib import Path
 
+from app.config import Settings
 from app.infra import llm_client as lc
 from app.narrator.prompts import INSIGHT_SYSTEM
 from app.narrator.types import Character, Insight
@@ -30,6 +31,7 @@ def _metadata_insight(meta_desc: str) -> Insight:
 
 
 def insight(image_path, metadata_desc, settings=None, vlm=None) -> Insight:
+    s = settings or Settings.load()
     v = vlm if vlm is not None else lc.get_vlm(settings)
     try:
         raw = v.describe(
@@ -40,6 +42,7 @@ def insight(image_path, metadata_desc, settings=None, vlm=None) -> Insight:
             ),
             system_prompt=INSIGHT_SYSTEM,
             json_mode=True,
+            model=s.insight_model,
         )
         data = extract_json(raw)
         if not data:

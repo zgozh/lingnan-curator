@@ -41,7 +41,7 @@ def write_story(insight: Insight, settings: Settings | None = None,
     try:
         for attempt in range(s.max_story_retry + 1):
             raw = call(_build_messages(insight), json_mode=False,
-                       temperature=0.9, settings=s)
+                       temperature=0.9, settings=s, model=s.story_model)
             text = (raw or "").strip()
             if not validate_story(text):
                 logger.warning("story 第 %d 次未过 detox（过短/命中禁词），回炉重写",

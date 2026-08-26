@@ -50,6 +50,20 @@ def test_chat_omits_temperature_when_unset():
     assert "temperature" not in comp.kwargs
 
 
+def test_chat_forwards_model_through_client_factory():
+    comp = FakeCompletions(content="答案")
+    out = lc.chat([{"role": "user", "content": "问"}], model="qwen-max",
+                  client_factory=_sdk(comp))
+    assert out == "答案"
+    assert comp.kwargs["model"] == "qwen-max"
+
+
+def test_chat_defaults_model_to_settings_when_omitted():
+    comp = FakeCompletions(content="答案")
+    lc.chat([{"role": "user", "content": "问"}], client_factory=_sdk(comp))
+    assert comp.kwargs["model"] == Settings().llm_model
+
+
 def test_describe_uses_passed_system_prompt_and_json_mode(tmp_path):
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"\xff\xd8 fake jpeg")
@@ -69,3 +83,12 @@ def test_describe_defaults_system_to_caption_when_omitted(tmp_path):
     _vlm(comp).describe(img, "描述这张照片")
     assert comp.kwargs["messages"][0] == {"role": "system", "content": lc.CAPTION_SYSTEM}
     assert "response_format" not in comp.kwargs
+
+
+def test_describe_uses_passed_model(tmp_path):
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"\xff\xd8 fake jpeg")
+    comp = FakeCompletions(content="未来城市")
+    out = _vlm(comp).describe(img, "描述这张照片", model="qwen-vl-max")
+    assert out == "未来城市"
+    assert comp.kwargs["model"] == "qwen-vl-max"

@@ -3,7 +3,7 @@ from app.narrator.insight import insight
 from app.narrator.types import Insight
 
 class FakeVLM:
-    def describe(self, image_path, user_prompt, system_prompt=None, json_mode=False):
+    def describe(self, image_path, user_prompt, system_prompt=None, json_mode=False, model=None):
         return ('{"scene":"广州骑楼街景","visibles":["骑楼","人力车"],'
                 '"characters":[{"who":"小贩","clothing":"唐装","age_hint":"民国"}],'
                 '"era_evidence":["骑楼","招牌"],"maybe_place":"广州",'
@@ -18,7 +18,7 @@ def test_insight_parses_vlm():
     assert res.characters and res.characters[0].who == "小贩"
 
 class BadVLM:
-    def describe(self, image_path, user_prompt, system_prompt=None, json_mode=False):
+    def describe(self, image_path, user_prompt, system_prompt=None, json_mode=False, model=None):
         raise RuntimeError("vlm down")
 
 def test_insight_falls_back_to_metadata():

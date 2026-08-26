@@ -5,7 +5,7 @@ from app.config import Settings
 STORY_OK = "开篇一句就很吸引人。" * 20  # >80 字且无禁用词
 
 class ChatOK:
-    def __call__(self, messages, json_mode=False, temperature=None, settings=None):
+    def __call__(self, messages, json_mode=False, temperature=None, settings=None, model=None):
         return STORY_OK
 
 def test_write_story_happy():
@@ -16,7 +16,7 @@ def test_write_story_happy():
 
 class ChatBannedThenOK:
     calls = 0
-    def __call__(self, messages, json_mode=False, temperature=None, settings=None):
+    def __call__(self, messages, json_mode=False, temperature=None, settings=None, model=None):
         self.calls += 1
         if self.calls == 1:
             return "岁月如梭，这个世界啊。" + ("字" * 80)
@@ -32,11 +32,12 @@ def test_write_story_passes_contract_kwargs():
     seen = {}
 
     class ChatSpy:
-        def __call__(self, messages, json_mode=False, temperature=None, settings=None):
+        def __call__(self, messages, json_mode=False, temperature=None, settings=None, model=None):
             seen["messages"] = messages
             seen["json_mode"] = json_mode
             seen["temperature"] = temperature
             seen["settings"] = settings
+            seen["model"] = model
             return STORY_OK
 
     st = Settings()
@@ -44,12 +45,13 @@ def test_write_story_passes_contract_kwargs():
     assert seen["json_mode"] is False
     assert seen["temperature"] == 0.9
     assert seen["settings"] is st
+    assert seen["model"] == st.story_model
     assert seen["messages"][0]["role"] == "system"
     assert "骑楼街" in seen["messages"][1]["content"]
 
 class ChatAlwaysBanned:
     calls = 0
-    def __call__(self, messages, json_mode=False, temperature=None, settings=None):
+    def __call__(self, messages, json_mode=False, temperature=None, settings=None, model=None):
         self.calls += 1
         return "岁月如梭，这个世界啊。" + ("字" * 80)
 
@@ -62,7 +64,7 @@ def test_write_story_degrades_after_retries_exhausted():
     assert s.source == "llm"
 
 class ChatBoom:
-    def __call__(self, messages, json_mode=False, temperature=None, settings=None):
+    def __call__(self, messages, json_mode=False, temperature=None, settings=None, model=None):
         raise RuntimeError("llm down")
 
 def test_write_story_degrades_on_llm_exception():
