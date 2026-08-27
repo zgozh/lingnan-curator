@@ -17,6 +17,35 @@
 - **数据输入闭环**：Web 上传 + 多来源公版图批量抓取 + AI 上色比稿评审页，一条龙走完「进来→入库→人工审美翻牌→上线」
 - **降级铁律**：rerank/CLIP/VLM/TTS 任一外部依赖失败，主链路照常可用（只标记 degraded）
 
+## 准备环境（按角色自查）
+
+| 你是谁 | 必备 | 得到的体验 |
+|---|---|---|
+| 🖼 只想浏览 | 浏览器 | 双击 `预览.html`：卡片墙→详情弹窗→滑块对比→粤语讲解播放器 |
+| ⚙️ 完整部署 | NVIDIA GPU ≥8GB 显存 · Windows 10/11 · ≥40GB 磁盘 · 最新 N 卡驱动 · uv · Docker Desktop · 自备 DashScope API Key（bailian.aliyun.com，测试成本 <¥5） | 全部八页面交互：混合检索/AI 策展/问答防幻觉/上传/抓取/比稿评审/口播合成 |
+| 🧪 仅验代码 | uv · 网络 | `uv sync` → `uv run pytest tests -q` = 245 passed |
+
+> 没有 GPU 也能跑完整部署：修复步骤自动跳过（标记 degraded）、上色走 HF 镜像回退、嵌入 CPU 较慢——馆建得起来，质量打折。
+
+## 上传 GitHub / Gitee（维护者操作）
+
+本仓库**已按干净体积设计推送结构**：
+
+- 随库分发约 **165MB** 数据资产（26 张核心成果图、30 条粤语音频、著录 CSV、RAGAS 报告）——克隆者零配置双击 `预览.html` 即可看图听讲
+- 不入库的大件：21.9GB 模型权重（`models/`）、405MB 原分辨率 restored.jpg、53MB 比稿存档 `enhanced-archive/`、落选素材 `_rejected/`——这些仅存在于 zip 发布包或需自行生成
+- 全历史扫描过：**无 >30MB blob**，远低于 GitHub 100MB 与 Gitee 单文件红线
+
+首次推送（网页上各自建好空仓库、**勿勾选初始化 README** 后执行）：
+
+```bash
+git remote add origin https://github.com/<你的用户名>/lingnan-curator.git
+git remote add gitee  https://gitee.com/<你的用户名>/lingnan-curator.git
+git push -u origin master
+git push -u gitee  master      # 国内访问建议同步镜像
+```
+
+日后如需归档本地权重库，改用 Git LFS 并留意 Gitee 免费 LFS 配额。
+
 ## 功能一览（Web 展馆）
 
 | 入口 | 说明 |
@@ -183,4 +212,5 @@ uv run pytest tests -q      # 245 个单测（外部服务全 mock，无需任�
 - W2 ✅ 混合检索 + 三 Agent + Web 展馆最小闭环
 - W3 ✅ 粤语口播 + RAGAS 评测（meets）+ 24 张真实语料 + GPU 化
 - 近期 ✅ 数据输入闭环（上传/双来源抓取/比稿评审，ADR-0012）+ 缩略图与问答流式修复
-- W4 🚧 申报书 PDF + 演示视频（打包冒烟已完成）
+- W4 ✅ 打包冒烟（zip+仓库双轨）· 离线展馆页 · START-HERE 导览 · 全馆藏口播补齐
+- W4 🚧 申报书 PDF + 演示视频
