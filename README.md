@@ -4,6 +4,8 @@
 （广州大学第二届「庆园杯」AI 创新应用大赛 · 主题三参赛项目，单人开发）
 
 > 设计文档 `docs/superpowers/specs/2026-08-24-lingnan-curator-design.md` · 架构 `docs/architecture.md` · 决策记录 `docs/adr/`（范围修订见 ADR-0012）· 进度 `docs/PROGRESS.md`
+>
+> 👉 **测试者请从根目录 `START-HERE.md` 开始**——按顺序看完五个站点只需 5 分钟；零配置可视化画廊请双击根目录 **`预览.html`**。
 
 ## 核心亮点
 
