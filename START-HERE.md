@@ -1,4 +1,4 @@
-# 🧭 START-HERE —— 解压后按这个顺序看
+﻿# 🧭 START-HERE —— 解压后按这个顺序看
 
 > 你拿到的是「湾区记忆·岭南非遗 AI 策展人」的完整交付包：
 > 把 26 张公有领域广州老照片（1840s~1940s）经 **AI 修复上色 → OCR → 多模态检索 → 三 Agent** 做成的 Web 展馆。
@@ -30,7 +30,7 @@
 
 ### 🧪 角色 C｜只验证代码质量（无 GPU 无密钥，5 分钟）
 - 安装 uv（命令同上）、磁盘 5GB（拉 torch cu126 轮子）
-- 然后：`uv sync` → `uv run pytest tests -q` 应输出 **245 passed**
+- 然后：`uv sync` → `uv run pytest tests -q` 应输出 **251 passed**
 
 ## 📝 测试反馈怎么给
 
@@ -112,7 +112,7 @@ uv run uvicorn app.web.main:app --port 8300       # 开 http://127.0.0.1:8300
 
 ```bash
 uv sync
-uv run pytest tests -q        # 245 个测试全绿；外部服务全 mock
+uv run pytest tests -q        # 251 个测试全绿；外部服务全 mock
 ```
 
 ## 目录速查
@@ -127,7 +127,7 @@ eval/reports/            ← RAGAS 报告
 docs/adr/                ← 12 条架构决策记录(含范围修订 ADR-0012)
 docs/superpowers/specs/  ← 完整设计文档
 app/                     ← 全部源码(FastAPI+LangGraph+Milvus)
-tests/                   ← 245 个单测
+tests/                   ← 251 个单测
 ```
 
 ## 版权说明

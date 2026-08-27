@@ -23,7 +23,7 @@
 |---|---|---|
 | 🖼 只想浏览 | 浏览器 | 双击 `预览.html`：卡片墙→详情弹窗→滑块对比→粤语讲解播放器 |
 | ⚙️ 完整部署 | NVIDIA GPU ≥8GB 显存 · Windows 10/11 · ≥40GB 磁盘 · 最新 N 卡驱动 · uv · Docker Desktop · 自备 DashScope API Key（bailian.aliyun.com，测试成本 <¥5） | 全部八页面交互：混合检索/AI 策展/问答防幻觉/上传/抓取/比稿评审/口播合成 |
-| 🧪 仅验代码 | uv · 网络 | `uv sync` → `uv run pytest tests -q` = 245 passed |
+| 🧪 仅验代码 | uv · 网络 | `uv sync` → `uv run pytest tests -q` = 251 passed |
 
 > 没有 GPU 也能跑完整部署：修复步骤自动跳过（标记 degraded）、上色走 HF 镜像回退、嵌入 CPU 较慢——馆建得起来，质量打折。
 
@@ -39,6 +39,24 @@
 | `/upload` | 上传新馆藏（版权红线校验 → 自动 pid → 后台管线 → 完成自动跳详情页） |
 | `/crawl` | 批量抓取公版图（Commons 默认/Openverse 可切换 → 结果表 → 一键排队入库） |
 | `/review` | AI 上色比稿评审：三方对比、逐张启用/撤下，旧版本永久保留在存档区 |
+
+## 能力对照：开馆后什么免费可用，什么需要钥匙
+
+按「快速路线」（`load-snapshot` 灌随库快照，零密钥零 GPU）逐项核实：
+
+| 功能 | 快速路线 | 依赖说明 |
+|---|---|---|
+| 照片墙 / 详情页浏览 | ✅ 免费看 | 成果图随库分发 |
+| 修复↔上色对比滑块 | ✅ 免费拉 | 克隆仓库无原分辨率 restored 图时，底层自动回退原始扫描件 |
+| 听 26 张已有粤语讲解 | ✅ 免费听 | narration.wav 随库分发 |
+| 多模态检索（文本/图像混合） | ✅ 免费查 | 向量快照直灌 Milvus；不开精排服务自动降级 degraded |
+| 问展馆 / 专题展一键生成 | 🔑 需 Key | 生成类动作走 DashScope LLM（快照只解决检索，不解决生成） |
+| 换音色重新合成口播 | 🔑 需 Key | CosyVoice TTS 按次计费，单张约几分钱 |
+| 抓取公版图（/crawl） | ✅ 免费抓 | 纯 HTTP + 许可白名单，无需任何密钥 |
+| 上传新照片（/upload） | ⚠️ 半免费 | 上传动作免费；入库管线需要 GPU（无 GPU 降级变慢）与 VLM 费用 |
+| AI 比稿评审（/review） | ⚠️ 需 Key | 增强候选生成走云端重绘；已有候选的翻牌切换免费 |
+
+> 一句话：**"看和听"零成本，"问和生成"要钥匙**。钥匙 = 自备 DashScope API Key（bailian.aliyun.com，测试全程 <¥5）。
 
 ## 技术架构
 
@@ -114,7 +132,7 @@ uv run uvicorn app.web.main:app --port 8300
 
 ```bash
 uv sync
-uv run pytest tests -q    # 245 个单测，外部服务全 mock，不需要任何在线服务
+uv run pytest tests -q    # 251 个单测，外部服务全 mock，不需要任何在线服务
 ```
 
 ## 数据输入三通道（新增功能详解）
@@ -175,7 +193,7 @@ uv run python -m app.cli narrate --pid gz_xxx      # 讲解词 + 粤语 TTS 音�
 ## 开发
 
 ```bash
-uv run pytest tests -q      # 245 个单测（外部服务全 mock，无需任何服务在线）
+uv run pytest tests -q      # 251 个单测（外部服务全 mock，无需任何服务在线）
 # 工程约束 8 条见 AGENTS.md（版权红线/密钥治理/降级铁律/TDD/依赖方向…）
 ```
 
