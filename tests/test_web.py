@@ -18,13 +18,12 @@ def _client(monkeypatch, *, milvus_ok=True) -> TestClient:
             "photo_id": "sample_a", "score": 0.9, "title": "骑楼A",
             "year": "1930", "location": "广州", "caption": "老街"})()],
             "degraded": set()})())
-    # 详情页会拉叙事链；必须 mock，否则真实加载会触发在线 LLM 链而挂起/失败。
+    # 详情页只读缓存（_read_story）；必须 mock，避免真实文件系统依赖。
+    # 页面不触发生成——生成走 /api/narrate，此处不需要 mock run_story_chain。
     monkeypatch.setattr(
-        wm, "run_story_chain",
-        lambda *a, **k: {
-            "story": "一个广州的老故事。",
-            "narration": '{"lines":[{"text":"旁白","emotion":"怀念"}]}',
-            "audio": True, "degraded": False},
+        wm, "_read_story",
+        lambda base: ("一个广州的老故事。",
+                      [{"text": "旁白", "emotion": "怀念"}]),
     )
     return TestClient(wm.create_app())
 
@@ -161,7 +160,7 @@ def test_detail_always_has_narration_audio_element(monkeypatch):
 
 
 def test_detail_renders_story_and_narration(monkeypatch):
-    """详情页应透传 run_story_chain 返回的故事文本 + 逐句旁白（含 emotion）。"""
+    """详情页应渲染缓存的故事文本 + 逐句旁白（含 emotion）。"""
     monkeypatch.setattr(wm, "_get_photo",
                         lambda pid, settings=None: {
                             "photo_id": pid, "title": "骑楼A",
@@ -171,30 +170,3 @@ def test_detail_renders_story_and_narration(monkeypatch):
     assert "一个广州的老故事。" in body
     assert "旁白" in body
     assert 'data-emotion="怀念"' in body
-
-
-def test_detail_passes_row_to_story_chain(monkeypatch):
-    """详情页必须把 fetch 到的 row 原样传入 run_story_chain。
-
-    否则 run_story_chain 内部 _metadata_desc(row) 拿不到元数据，
-    故事生成会退化为"一张岭南老照片"。
-    """
-    row = {"photo_id": "sample_a", "title": "骑楼A", "year": "1930",
-           "location": "广州", "caption": "老街", "has_colorized": 0}
-    monkeypatch.setattr(wm, "_get_photo", lambda pid, settings=None: row)
-    c = _client(monkeypatch)
-    captured = {}
-
-    def fake_chain(photo_id, **kwargs):
-        captured.update(photo_id=photo_id, kwargs=kwargs)
-        return {"story": "一个广州的老故事。", "narration": "{}",
-                "audio": False, "degraded": False}
-
-    # 覆盖 _client 里的默认 mock，改为捕获 kwargs（_client 已 built TestClient，
-    # 但 photo_page 在请求时按模块全局查找 run_story_chain，故此处仍生效）。
-    monkeypatch.setattr(wm, "run_story_chain", fake_chain)
-    r = c.get("/photo/sample_a")
-    assert r.status_code == 200
-    assert captured["photo_id"] == "sample_a"
-    # row 必须是 _get_photo 返回的同一 dict，而不是被吞掉/置空
-    assert captured["kwargs"].get("row") is row

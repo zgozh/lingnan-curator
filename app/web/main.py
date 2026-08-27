@@ -5,6 +5,7 @@
 """
 import json
 import logging
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -19,6 +20,10 @@ from app.narrator.story import run_story_chain
 from app.retrieval import pipeline as rpipe
 
 logger = logging.getLogger(__name__)
+
+# 健康探活缓存：rerank 未启动时探活要 2s 超时，不能每次请求都重复联网探活。
+_FLAGS_TTL = 30.0
+_flags_cache: dict = {"t": 0.0, "v": {}}
 
 _BASE = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(_BASE / "templates"))
@@ -53,6 +58,27 @@ def _get_photo(photo_id: str, settings=None) -> dict | None:
     return rows[0] if rows else None
 
 
+def _read_story(base: Path) -> tuple[str, list]:
+    """读已缓存的叙事产物（幂等缓存）：story.json + narration.json。
+
+    只读、不触发 LLM（生成走 /api/narrate）；未生成返回空。
+    任何解析失败按空处理，绝不打垮页面（降级铁律）。
+    """
+    story_text, narration_lines = "", []
+    try:
+        sp = base / "story.json"
+        if sp.exists():
+            story_text = json.loads(sp.read_text(encoding="utf-8")).get("text", "")
+        np_ = base / "narration.json"
+        if np_.exists():
+            _narr = json.loads(np_.read_text(encoding="utf-8"))
+            _lines = _narr.get("lines", [])
+            narration_lines = _lines if isinstance(_lines, list) else []
+    except Exception:  # noqa: BLE001
+        story_text, narration_lines = "", []
+    return story_text, narration_lines
+
+
 def _settings():
     from app.config import Settings
 
@@ -60,7 +86,13 @@ def _settings():
 
 
 def _health_flags() -> dict[str, bool]:
-    """外部依赖探活；任何异常按不可用处理，绝不让健康检查挂死。"""
+    """外部依赖探活；任何异常按不可用处理，绝不让健康检查挂死。
+
+    结果缓存 _FLAGS_TTL 秒：rerank 未启动时探活要 2s 超时，不能每请求都探。
+    """
+    now = time.monotonic()
+    if _flags_cache["v"] and (now - _flags_cache["t"]) < _FLAGS_TTL:
+        return dict(_flags_cache["v"])
     flags = {"milvus": False, "rerank": False}
     try:
         s = _settings()
@@ -75,7 +107,9 @@ def _health_flags() -> dict[str, bool]:
                                             None))
     except Exception:  # noqa: BLE001
         pass
-    return flags
+    _flags_cache["t"] = now
+    _flags_cache["v"] = flags
+    return dict(flags)
 
 
 def create_app() -> FastAPI:
@@ -121,16 +155,8 @@ def create_app() -> FastAPI:
         if row is None:
             raise HTTPException(404, "馆藏中不存在该照片")
         base = Path("data/processed") / photo_id
-        # 叙事链：幂等（已生成→缓存即返；未生成→首次触发生成），任何环节失败已降级不抛。
-        # 关键：必须把已 fetch 的 row 传入，否则 _metadata_desc(row) 拿不到元数据，
-        # 故事生成会退化为"一张岭南老照片"。
-        chain = run_story_chain(photo_id, row=row)
-        try:
-            narr = json.loads(chain.get("narration") or "{}")
-            narration_lines = narr.get("lines", [])
-        except Exception:  # noqa: BLE001 —— 旁白解析失败按空处理，不打垮页面
-            narration_lines = []
-        story_text = chain.get("story", "")
+        # 只读缓存，不触发生成（生成走 /api/narrate 按钮）——保页面秒开。
+        story_text, narration_lines = _read_story(base)
         return TEMPLATES.TemplateResponse(
             request, "detail.html",
             {"p": row, "pid": photo_id,
@@ -142,9 +168,7 @@ def create_app() -> FastAPI:
              "voices": VOICES,
              "tts_voice": _settings().tts_voice,
              "story": story_text,
-             "narration_lines": narration_lines,
-             "chain_degraded": chain.get("degraded", False),
-             "chain_audio": chain.get("audio", False)},
+             "narration_lines": narration_lines},
         )
 
     @app.get("/exhibit")

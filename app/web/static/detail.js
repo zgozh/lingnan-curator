@@ -51,20 +51,10 @@ if (gen) {
         return;
       }
       const data = await resp.json();
-      const audio = document.getElementById('narration-audio');
-      const hasVideoNode = !!document.querySelector('section.narration video');
-      if (audio) {
-        audio.src = `/media/${gen.dataset.pid}/narration.wav?v=${Date.now()}`;
-        audio.hidden = hasVideoNode;
-        if (!hasVideoNode) {
-          audio.load();
-          audio.play().catch(() => {});
-        }
-      }
-      gen.textContent = '换音色重新合成';
-      status.textContent = hasVideoNode
-        ? '音频已更新；口播视频需重跑预生成后刷新页面'
-        : '已完成，正在播放试听';
+      // 生成完成：刷新页面展示新生成的故事 + 旁白 + 音频
+      // （详情页只读幂等缓存，刷新秒开；音频 src 已由 has_narration 命中）
+      status.textContent = '生成完成，正在刷新…';
+      setTimeout(() => window.location.reload(), 500);
     } catch {
       status.textContent = '网络异常，请重试';
     } finally {
