@@ -301,6 +301,50 @@ def cmd_tailor(args) -> None:
     print(f"完成 {ok_n}/{len(pids)}；到 /review 页逐张评审启用")
 
 
+def cmd_crawl(args) -> None:
+    """Commons 公版图爬取：写 data/raw + 追加 meta.csv（版权红线内置过滤）。"""
+    from pathlib import Path
+
+    import httpx
+
+    from app.ingest.commons_crawler import _HEADERS, crawl
+    from app.ingest.meta import load_meta
+
+    raw = Path("data/raw")
+    with httpx.Client(timeout=60, headers=_HEADERS) as cli:
+        rows = crawl(args.query, args.limit, args.location, cli, raw)
+    if not rows:
+        print("[NG] 没有符合条件的公版图，试试更换关键词")
+        return
+    # 直接追加 meta.csv（复用上传通道的追加器保持格式一致）
+    import csv
+
+    meta = raw / "meta.csv"
+    meta.parent.mkdir(parents=True, exist_ok=True)
+    header = ["photo_id", "title", "year", "location", "source_url",
+              "license"]
+    existing: set[str] = set()
+    if meta.exists():
+        with open(meta, encoding="utf-8-sig", newline="") as f:
+            existing = {(r.get("photo_id") or "").strip()
+                        for r in csv.DictReader(f)}
+        need_header = False
+    else:
+        need_header = True
+    with open(meta, "a", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=header)
+        if need_header:
+            writer.writeheader()
+        for r in rows:
+            while r["photo_id"] in existing:
+                r["photo_id"] += "_" + __import__("uuid").uuid4().hex[:4]
+            writer.writerow(r)
+            existing.add(r["photo_id"])
+    print(f"完成：{len(rows)} 张入 raw+meta；运行 "
+          f"`uv run python -m app.cli ingest --src data/raw` 入库"
+          f"（或逐张 --pid）")
+
+
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="lingnan", description="岭南非遗 AI 策展人")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -348,6 +392,13 @@ def main(argv: list[str] | None = None) -> None:
     tl.add_argument("--all", action="store_true", help="全量馆藏")
     tl.add_argument("--force", action="store_true", help="重新生成已有候选")
     tl.set_defaults(func=cmd_tailor)
+
+    cw = sub.add_parser("crawl",
+                        help="Wikimedia Commons 公版图爬取(仅 PD/CC0)")
+    cw.add_argument("--query", required=True, help="检索词，如 Guangzhou 1930")
+    cw.add_argument("--limit", type=int, default=10, help="最多抓取张数")
+    cw.add_argument("--location", default="", help="meta 地点字段填充值")
+    cw.set_defaults(func=cmd_crawl)
 
     for name in ("serve",):
         sp = sub.add_parser(name)
