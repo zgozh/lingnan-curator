@@ -33,3 +33,4 @@ Thumbs.db
 # 会话/临时产物
 tmp/
 .superpowers/
+data/logs/
