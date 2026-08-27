@@ -519,6 +519,10 @@ def create_app() -> FastAPI:
         _spawn_ingest_batch(ok)
         return {"ok": True, "queued": ok, "rejected": rejected}
 
+    @app.get("/ask")
+    def ask_page(request: Request):
+        return TEMPLATES.TemplateResponse(request, "ask.html", {})
+
     @app.post("/api/ask")
     async def api_ask(request: Request):
         body = await request.json()

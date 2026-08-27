@@ -29,3 +29,7 @@ eval/reports/
 # 系统
 Thumbs.db
 .DS_Store
+
+# 会话/临时产物
+tmp/
+.superpowers/
