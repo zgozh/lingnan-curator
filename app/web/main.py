@@ -25,8 +25,35 @@ logger = logging.getLogger(__name__)
 _FLAGS_TTL = 30.0
 _flags_cache: dict = {"t": 0.0, "v": {}}
 
+# 中文标题 sidecar（titles-zh.json）缓存：按文件 mtime 失效。
+_zh_cache: dict = {"mtime": None, "v": {}}
+
 _BASE = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(_BASE / "templates"))
+
+
+def _titles_zh() -> dict[str, str]:
+    """读中文标题映射（mtime 变了才重新加载；缺失/损坏→空）。"""
+    p = Path("data/processed/titles-zh.json")
+    try:
+        mt = p.stat().st_mtime
+    except OSError:
+        return {}
+    if _zh_cache["v"] and _zh_cache["mtime"] == mt:
+        return _zh_cache["v"]
+    from app.ingest.title_zh import load_titles_zh
+
+    v = load_titles_zh(p)
+    _zh_cache.update(mtime=mt, v=v)
+    return v
+
+
+def _zh_title(pid: str, title: str = "") -> str:
+    """模板用：优先中文短标题，缺失回退原档案名。"""
+    return _titles_zh().get(str(pid or ""), "") or (title or "")
+
+
+TEMPLATES.env.globals["zh_title"] = _zh_title
 
 
 def _photos_all(settings=None) -> list[dict]:

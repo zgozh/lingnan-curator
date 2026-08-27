@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}照片墙 · 湾区记忆{% endblock %}
 {% block body %}
 <h1>馆藏照片墙</h1>
@@ -15,7 +15,7 @@
     <img src="/media/{{ p.photo_id }}/restored.jpg"
          onerror="this.src='/static/placeholder.svg'" alt="{{ p.title }}">
     <div class="card-body">
-      <strong>{{ p.title }}</strong>
+      <strong>{{ zh_title(p.photo_id, p.title) }}</strong>
       <small>{{ p.year or '年代不详' }} · {{ p.location or '地点不详' }}
         {% if p.has_colorized %}<span class="tag">已上色</span>{% endif %}</small>
     </div>

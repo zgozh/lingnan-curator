@@ -1,7 +1,9 @@
 {% extends "base.html" %}
-{% block title %}{{ p.title }} · 详情{% endblock %}
+{% block title %}{{ zh_title(p.photo_id, p.title) }} · 详情{% endblock %}
 {% block body %}
-<h1>{{ p.title }}</h1>
+{% set t = zh_title(p.photo_id, p.title) %}
+<h1>{{ t }}</h1>
+{% if t != p.title %}<p class="hint">档案原名：{{ p.title }}</p>{% endif %}
 <p class="hint">{{ p.year or '年代不详' }} · {{ p.location or '地点不详' }}
   ｜来源：<a href="{{ p.source_url }}" rel="license noopener"
      target="_blank">{{ p.license }}</a></p>

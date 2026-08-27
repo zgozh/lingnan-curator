@@ -153,6 +153,32 @@ def cmd_eval(args) -> None:
     raise SystemExit(0 if ok else 2)
 
 
+def cmd_zh_titles(args) -> None:
+    """标题中文化：批量提炼/翻译馆藏档案名 → data/processed/titles-zh.json。"""
+    from app.config import Settings
+    from app.infra.milvus_store import get_client
+    from app.ingest.title_zh import (
+        build_titles_zh, clean_title, save_titles_zh,
+    )
+
+    s = Settings.load()
+    rows = get_client(s).query(
+        collection_name=s.collection,
+        filter='photo_id != ""',
+        output_fields=["photo_id", "title"],
+        limit=1000,
+    )
+    if args.limit > 0:
+        rows = rows[: args.limit]
+    print(f"取到 {len(rows)} 条著录，开始提炼中文名……")
+    mapping = build_titles_zh(rows, settings=s)
+    out = save_titles_zh(mapping)
+    orig = {str(r.get("photo_id")): clean_title(str(r.get("title") or ""))
+            for r in rows}
+    n_changed = sum(1 for k, v in mapping.items() if orig.get(k) != v)
+    print(f"完成：{len(mapping)} 条 -> {out}（改写 {n_changed} 条）")
+
+
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="lingnan", description="岭南非遗 AI 策展人")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -170,6 +196,11 @@ def main(argv: list[str] | None = None) -> None:
     ev = sub.add_parser("eval", help="RAGAS 评测：批量问答→指标→报告")
     ev.add_argument("--questions", default="eval/questions.jsonl")
     ev.set_defaults(func=cmd_eval)
+
+    zt = sub.add_parser("zh-titles",
+                        help="标题中文化：批量提炼馆藏档案名→titles-zh.json")
+    zt.add_argument("--limit", type=int, default=0, help="只处理前 N 条(0=全部)")
+    zt.set_defaults(func=cmd_zh_titles)
 
     for name in ("serve",):
         sp = sub.add_parser(name)

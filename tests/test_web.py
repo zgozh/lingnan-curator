@@ -159,6 +159,27 @@ def test_detail_always_has_narration_audio_element(monkeypatch):
     assert 'id="narration-audio"' in body
 
 
+def test_home_shows_chinese_title(monkeypatch):
+    """照片墙主标应优先中文短标题（zh_title 模板全局）。"""
+    monkeypatch.setattr(wm, "_titles_zh", lambda: {"sample_a": "骑楼老街"})
+    c = _client(monkeypatch)
+    assert "骑楼老街" in c.get("/").text
+
+
+def test_detail_prefers_zh_title_and_keeps_original(monkeypatch):
+    """详情页主标用中文名；与原名不同时保留一行档案原名（数据保真）。"""
+    monkeypatch.setattr(wm, "_titles_zh", lambda: {"sample_a": "骑楼老街"})
+    monkeypatch.setattr(
+        wm, "_get_photo",
+        lambda pid, settings=None: {
+            "photo_id": pid, "title": "骑楼A",
+            "caption": "c", "has_colorized": 0})
+    c = _client(monkeypatch)
+    body = c.get("/photo/sample_a").text
+    assert "<h1>骑楼老街</h1>" in body
+    assert "档案原名：骑楼A" in body
+
+
 def test_detail_renders_story_and_narration(monkeypatch):
     """详情页应渲染缓存的故事文本 + 逐句旁白（含 emotion）。"""
     monkeypatch.setattr(wm, "_get_photo",
