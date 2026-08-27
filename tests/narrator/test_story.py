@@ -178,3 +178,24 @@ def test_run_story_chain_review_retry_regenerates_once(tmp_path):
     assert res["source"] == "llm"
     assert res["degraded"] is True          # 审稿低分已标记降级
     assert res["audio"] is True
+
+
+def test_run_story_chain_threads_voice_to_tts(tmp_path):
+    """voice 参数必须沿链透传到 deps.tts(..., voice=...)（IM-1 回归钉）。
+
+    前端"换音色重新合成"经 api_narrate → run_story_chain(force=True, voice=...)
+    重建 narration.wav，因此编排器必须把 voice 原样交给 TTS。
+    """
+    captured = {}
+
+    class VoiceDeps(Deps):
+        @staticmethod
+        def tts(*a, **k):
+            captured.update(k=k)
+            return True
+
+    res = run_story_chain("sample_voice", settings=None, out_root=tmp_path,
+                          deps=VoiceDeps, voice="longanyue")
+    assert res["audio"] is True
+    assert res["degraded"] is False
+    assert captured["k"].get("voice") == "longanyue"

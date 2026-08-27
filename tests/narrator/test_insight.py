@@ -26,3 +26,21 @@ def test_insight_falls_back_to_metadata():
     assert res.degraded is True
     assert res.source == "metadata"
     assert "广州" in res.scene
+
+
+def test_insight_get_vlm_raise_degrades(monkeypatch):
+    """IM-2 回归钉：lc.get_vlm 构造客户端失败（缺 key/import 失败/坏 base_url）
+    也必须降级为 metadata Insight，绝不向上抛异常（否则详情页 500）。
+
+    此前 get_vlm 位于 try 之外会漏出；现移入 try 内。
+    """
+    import app.narrator.insight as ins
+
+    def boom(settings=None):
+        raise RuntimeError("vlm client construction failed")
+
+    monkeypatch.setattr(ins.lc, "get_vlm", boom)
+    res = insight(Path("x.jpg"), "title=街景|year=1920|location=广州|caption=骑楼")
+    assert res.degraded is True
+    assert res.source == "metadata"
+    assert "广州" in res.scene  # 降级稿来自元数据

@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.agents import creator, curator, docent, narrator
+from app.agents import creator, curator, docent
 from app.infra import reranker as rr
 from app.infra.tts import VOICES
 from app.narrator.story import run_story_chain
@@ -174,11 +174,9 @@ def create_app() -> FastAPI:
         if voice is not None and voice not in VOICES:
             raise HTTPException(400, f"不支持的音色: {voice}，"
                                      f"可选: {sorted(VOICES)}")
-        result = narrator.narrate(photo_id, voice=voice)
-        if "error" in result:
-            msg = result["error"]
-            raise HTTPException(404 if "不存在" in msg else 502, msg)
-        return result
+        chain = run_story_chain(photo_id, force=True, voice=voice)
+        return {"audio": bool(chain.get("audio")),
+                "degraded": bool(chain.get("degraded"))}
 
     @app.post("/api/create/{photo_id}")
     def api_create(photo_id: str, body: dict):

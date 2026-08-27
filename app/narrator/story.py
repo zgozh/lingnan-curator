@@ -76,14 +76,14 @@ class _DefaultDeps:
         return m.review(ins, st, settings=settings, chat=chat)
 
     @staticmethod
-    def tts(text, settings, out_path):
+    def tts(text, settings, out_path, voice=None):
         from app.infra.tts import get_tts
         s = settings or __import__("app.config", fromlist=["Settings"]).Settings.load()
-        return get_tts(s).synthesize(text, s.tts_voice, out_path)
+        return get_tts(s).synthesize(text, voice or s.tts_voice, out_path)
 
 
 def run_story_chain(photo_id, settings=None, force=False, deps=None,
-                    out_root=None, raw_dir=None, row=None) -> dict:
+                    out_root=None, raw_dir=None, row=None, voice=None) -> dict:
     deps = deps or _DefaultDeps
     s = settings or __import__("app.config", fromlist=["Settings"]).Settings.load()
     out_root = Path(out_root or "data/processed")
@@ -133,7 +133,7 @@ def run_story_chain(photo_id, settings=None, force=False, deps=None,
     nar_p.write_text(json.dumps({"lines": lines}, ensure_ascii=False, indent=2), encoding="utf-8")
 
     try:
-        ok = deps.tts(plain, s, wav_p)
+        ok = deps.tts(plain, s, wav_p, voice=voice)
         result["audio"] = bool(ok)
         result["degraded"] = result["degraded"] or not ok
     except Exception:  # noqa: BLE001 —— 降级边界，绝不抛出

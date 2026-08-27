@@ -32,8 +32,8 @@ def _metadata_insight(meta_desc: str) -> Insight:
 
 def insight(image_path, metadata_desc, settings=None, vlm=None) -> Insight:
     s = settings or Settings.load()
-    v = vlm if vlm is not None else lc.get_vlm(settings)
     try:
+        v = vlm if vlm is not None else lc.get_vlm(settings)
         raw = v.describe(
             Path(image_path),
             user_prompt=(

@@ -88,24 +88,34 @@ def test_create_copy_maps_errors(monkeypatch):
 
 
 def test_narrate_api_voice_override_and_errors(monkeypatch):
+    """换音色重新合成：委托给 run_story_chain(force=True, voice=voice)。
+
+    校验：合法音色 → 200 + force=True + voice 透传；非法音色 → 400；
+    空 body → 200 + voice=None（降级回默认音色）。
+    """
     captured = {}
 
-    def fake_narrate(pid, settings=None, voice=None):
-        captured.update(pid=pid, voice=voice)
-        return {"audio": True, "photo_id": pid}
+    def fake_chain(photo_id, force=False, voice=None, **kwargs):
+        captured.update(photo_id=photo_id, force=force, voice=voice)
+        return {"audio": True, "degraded": False}
 
-    monkeypatch.setattr(wm.narrator, "narrate", fake_narrate)
+    # 先建 client（_client 会先用默认 lambda 覆盖 run_story_chain），
+    # 再覆盖为捕获版：api_narrate 在请求时按模块全局查找，故此处仍生效。
     c = _client(monkeypatch)
+    monkeypatch.setattr(wm, "run_story_chain", fake_chain)
 
     r = c.post("/api/narrate/sample_a", json={"voice": "longanyue"})
     assert r.status_code == 200
-    assert captured["pid"] == "sample_a" and captured["voice"] == "longanyue"
+    assert captured["photo_id"] == "sample_a"
+    assert captured["force"] is True
+    assert captured["voice"] == "longanyue"
 
     r2 = c.post("/api/narrate/sample_a", json={"voice": "不存在的音色"})
-    assert r2.status_code == 400
+    assert r2.status_code == 400  # 校验前置：非法音色仍拦下，不触达链
 
     r3 = c.post("/api/narrate/sample_a", json={})
-    assert r3.status_code == 200 and captured["voice"] is None
+    assert r3.status_code == 200
+    assert captured["voice"] is None
 
 
 def test_detail_page_lists_cantonese_voices(monkeypatch):
