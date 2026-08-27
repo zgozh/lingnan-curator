@@ -155,3 +155,4 @@
 - 数据输入 A：Web 上传通道 /upload（license/source_url 版权红线必填校验+PIL 真伪嗅探+20MB 上限+自动 pid 去重）→ ingest --pid 单张后台管线 → store-status 轮询跳详情
 - 数据输入 B：Commons 公版图爬虫 app/ingest/commons_crawler.py（仅 PD/CC0 白名单过滤、合规 UA 过机器人政策 403、单条失败降级）；CLI crawl --query --limit --location；实测抓通 Canton 1910 两张
 - 数据输入升级：多来源抓取适配器 sources.py(commons/openverse)+Web 批量抓取页 /crawl(任务轮询+一键入库批次)+ingest --pid 逗号批量；问展馆前端完善(示例问题/拒答引导样式/引用说明)；全链路实测抓取2张并排队入库(e647a20)
+- W4 打包冒烟：ADR-0012 范围修订(数字人视频裁撤/数据通道转正)+README 三测试模式重写；发布包含全部 26 张照片成果与著录，暂存副本内 fresh 解压跑通 245 测试
