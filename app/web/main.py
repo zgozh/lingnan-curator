@@ -53,7 +53,25 @@ def _zh_title(pid: str, title: str = "") -> str:
     return _titles_zh().get(str(pid or ""), "") or (title or "")
 
 
-TEMPLATES.env.globals["zh_title"] = _zh_title
+def _media_src(pid: str) -> str:
+    """展示图优先级：增强图 > 上色 > 修复；缺则占位图。"""
+    base = Path("data/processed") / str(pid or "")
+    for name in ("enhanced.jpg", "colorized.jpg", "restored.jpg"):
+        if (base / name).exists():
+            return f"/media/{pid}/{name}"
+    return "/static/placeholder.svg"
+
+
+def _media_exists(pid: str, name: str) -> bool:
+    return (Path("data/processed") / str(pid or "") /
+            name).is_file()
+
+
+# 经模块属性转发，留测试缝（monkeypatch 可替换实现）
+TEMPLATES.env.globals["media_src"] = lambda pid: _media_src(pid)
+TEMPLATES.env.globals["media_exists"] = lambda pid, name: (
+    _media_exists(pid, name))
+TEMPLATES.env.globals["zh_title"] = lambda *a, **k: _zh_title(*a, **k)
 
 
 def _photos_all(settings=None) -> list[dict]:

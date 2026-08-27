@@ -11,7 +11,7 @@
 <div class="grid">
   {% for h in hits %}
   <a class="card" href="/photo/{{ h.photo_id }}">
-    <img src="/media/{{ h.photo_id }}/restored.jpg"
+    <img src="{{ media_src(photo_id) }}"
          onerror="this.src='/static/placeholder.svg'" alt="{{ h.title }}">
     <div class="card-body">
       <strong>{{ zh_title(h.photo_id, h.title) }}</strong>

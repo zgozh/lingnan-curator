@@ -9,14 +9,22 @@
      target="_blank">{{ p.license }}</a></p>
 
 <div class="compare" data-has-colorized="{{ '1' if has_colorized else '0' }}">
-  {% if has_colorized %}
+  {% set top_name = 'enhanced.jpg' if media_exists(pid, 'enhanced.jpg')
+                    else 'colorized.jpg' %}
+  {% set top_label = 'AI 增强上色（褶皱修复·自然色）' if top_name == 'enhanced.jpg'
+                      else '上色后' %}
+  {% if has_colorized or media_exists(pid, 'enhanced.jpg') %}
   <div class="slider">
     <img class="layer base" src="/media/{{ pid }}/restored.jpg" alt="修复后">
-    <img class="layer top" src="/media/{{ pid }}/colorized.jpg" alt="上色后">
+    <img class="layer top" src="/media/{{ pid }}/{{ top_name }}" alt="{{ top_label }}">
     <input type="range" min="0" max="100" value="50"
            aria-label="上色对比滑块">
   </div>
+  {% if top_name == 'enhanced.jpg' %}
+  <p class="hint">拖动滑块对比：修复原图 ↔ AI 增强上色（去褶皱 + 自然彩色）</p>
+  {% else %}
   <p class="hint">拖动滑块对比：修复原图 ↔ AI 上色</p>
+  {% endif %}
   {% else %}
   <img src="/media/{{ pid }}/restored.jpg" alt="修复后">
   <p class="hint">本张未完成上色（管线降级），仅展示修复结果。</p>

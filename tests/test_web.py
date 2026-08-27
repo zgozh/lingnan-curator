@@ -180,6 +180,38 @@ def test_detail_prefers_zh_title_and_keeps_original(monkeypatch):
     assert "档案原名：骑楼A" in body
 
 
+def test_media_src_priority(tmp_path, monkeypatch):
+    """展示图优先级：enhanced > colorized > restored > 占位图。"""
+    import os
+
+    monkeypatch.chdir(tmp_path)
+    d = tmp_path / "data/processed/p1"
+    d.mkdir(parents=True)
+    assert wm._media_src("p1").endswith("placeholder.svg")
+    (d / "restored.jpg").write_bytes(b"x")
+    assert wm._media_src("p1") == "/media/p1/restored.jpg"
+    (d / "colorized.jpg").write_bytes(b"x")
+    assert wm._media_src("p1") == "/media/p1/colorized.jpg"
+    (d / "enhanced.jpg").write_bytes(b"x")
+    assert wm._media_src("p1") == "/media/p1/enhanced.jpg"
+
+
+def test_detail_slider_uses_enhanced_when_present(monkeypatch, tmp_path):
+    """/photo 页滑块顶图层：有 enhanced 用之，否则回退 colorized。"""
+    monkeypatch.setattr(wm, "_get_photo",
+                        lambda pid, settings=None: {
+                            "photo_id": pid, "title": "t",
+                            "caption": "c", "has_colorized": 1})
+    c = _client(monkeypatch)
+    body = c.get("/photo/sample_a").text
+    assert 'src="/media/sample_a/colorized.jpg"' in body   # 无 enhanced
+    monkeypatch.setattr(wm, "_media_exists",
+                        lambda pid, name: name == "enhanced.jpg")
+    body2 = c.get("/photo/sample_a").text
+    assert 'src="/media/sample_a/enhanced.jpg"' in body2
+    assert "去褶皱" in body2
+
+
 def test_detail_renders_story_and_narration(monkeypatch):
     """详情页应渲染缓存的故事文本 + 逐句旁白（含 emotion）。"""
     monkeypatch.setattr(wm, "_get_photo",

@@ -229,6 +229,16 @@ def cmd_refine(args) -> None:
     print(f"完成 {ok_n}/{len(pids)}；副产物仅供人工比对采纳，未改主产物")
 
 
+def cmd_enhance(args) -> None:
+    """画质增强云链：修褶皱→自然色→回贴锐化，产出 enhanced.jpg 副产物。"""
+    from app.ingest.enhance import build_enhanced
+
+    t0 = __import__("time").time()
+    ok = build_enhanced(args.pid)
+    tag = "OK" if ok else "NG(已降级,沿用原产物)"
+    print(f"[{tag}] {args.pid}: enhanced.jpg ({__import__('time').time() - t0:.0f}s)")
+
+
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="lingnan", description="岭南非遗 AI 策展人")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -260,6 +270,11 @@ def main(argv: list[str] | None = None) -> None:
                     help="sr=超分保真(默认)；repair=划痕霉斑修复(需人工审)")
     rf.add_argument("--force", action="store_true", help="重跑已有副产物")
     rf.set_defaults(func=cmd_refine)
+
+    en = sub.add_parser("enhance",
+                        help="画质增强云链：修褶皱+自然色→enhanced.jpg(不覆盖原图)")
+    en.add_argument("--pid", required=True, help="photo_id")
+    en.set_defaults(func=cmd_enhance)
 
     for name in ("serve",):
         sp = sub.add_parser(name)

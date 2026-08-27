@@ -13,7 +13,7 @@
   <div class="grid">
     {% for pid in sec.photo_ids %}
     <a class="card" href="/photo/{{ pid }}">
-      <img src="/media/{{ pid }}/restored.jpg"
+      <img src="{{ media_src(pid) }}"
            onerror="this.src='/static/placeholder.svg'" alt="">
     </a>
     {% endfor %}

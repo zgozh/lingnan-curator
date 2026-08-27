@@ -91,9 +91,9 @@ def _pick_src(src: Path | None) -> Path | None:
 
 
 def pick_background(pid_dir: Path | str) -> Path | None:
-    """选文创底图：上色图优先，其次修复图；都缺返回 None。"""
+    """选文创底图：增强图 > 上色图 > 修复图；都缺返回 None。"""
     d = Path(pid_dir)
-    for name in ("colorized.jpg", "restored.jpg"):
+    for name in ("enhanced.jpg", "colorized.jpg", "restored.jpg"):
         if (d / name).exists():
             return d / name
     return None

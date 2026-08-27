@@ -61,3 +61,5 @@ def test_pick_bg_prefers_colorized(tmp_path, monkeypatch):
     assert pick_background(d).name == "restored.jpg"
     (d / "colorized.jpg").write_bytes(b"x")
     assert pick_background(d).name == "colorized.jpg"   # 上色优先
+    (d / "enhanced.jpg").write_bytes(b"x")
+    assert pick_background(d).name == "enhanced.jpg"    # 增强图最优先
