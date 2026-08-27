@@ -209,7 +209,7 @@ def test_detail_slider_uses_enhanced_when_present(monkeypatch, tmp_path):
                         lambda pid, name: name == "enhanced.jpg")
     body2 = c.get("/photo/sample_a").text
     assert 'src="/media/sample_a/enhanced.jpg"' in body2
-    assert "去褶皱" in body2
+    assert "结构保真" in body2
 
 
 # ---------- 比稿评审流 ----------

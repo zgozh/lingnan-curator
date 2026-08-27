@@ -5,7 +5,18 @@ from pathlib import Path
 import app.ingest.vision_ops as vo
 
 
-def test_build_cmd_restore_uses_cf_venv_and_script():
+def _stub_venv(monkeypatch):
+    """vendor venv 是重环境资产（models/vendor，~20GB），测试与其解耦：
+    打桩路径存在性，仅断言命令拼装逻辑。"""
+    monkeypatch.setattr(
+        vo, "_venv_python",
+        lambda kind: f"C:/vend/{'venv-cf' if kind == 'cf' else 'venv-dd'}/"
+                     f"{('Scripts' if __import__('os').name == 'nt' else 'bin')}/"
+                     f"{'python.exe' if __import__('os').name == 'nt' else 'python'}")
+
+
+def test_build_cmd_restore_uses_cf_venv_and_script(monkeypatch):
+    _stub_venv(monkeypatch)
     cmd = vo._build_cmd("cf", Path("in.jpg"), Path("data/processed/a/restored.jpg"))
     assert isinstance(cmd, list) and "venv-cf" in cmd[0]
     assert any("inference_codeformer" in c for c in cmd)
@@ -13,6 +24,7 @@ def test_build_cmd_restore_uses_cf_venv_and_script():
 
 def test_build_cmd_colorize_falls_back_to_hf_when_no_local_weights(monkeypatch):
     """本地权重缺失时回退 HF model_name 分支（与真实环境解耦）。"""
+    _stub_venv(monkeypatch)
     real_exists = Path.exists
 
     def fake_exists(self: Path):
@@ -28,6 +40,7 @@ def test_build_cmd_colorize_falls_back_to_hf_when_no_local_weights(monkeypatch):
 
 def test_build_cmd_colorize_prefers_local_weights(monkeypatch):
     """spike 结论：hub 1.28 与镜像元数据不兼容 → 本地权重优先。"""
+    _stub_venv(monkeypatch)
     real_exists = Path.exists
 
     def fake_exists(self: Path):
@@ -42,6 +55,7 @@ def test_build_cmd_colorize_prefers_local_weights(monkeypatch):
 
 def test_run_env_carries_hf_mirror_and_borrowed_basicsr(monkeypatch, tmp_path):
     """spike 结论落地：子进程必须带 HF_ENDPOINT 与指向 DDColor 的 PYTHONPATH。"""
+    _stub_venv(monkeypatch)
     seen = {}
 
     def fake_run(cmd, **kw):
@@ -76,6 +90,7 @@ def test_harvest_no_image_false(tmp_path):
 
 def test_run_wraps_subprocess(monkeypatch, tmp_path):
     """成功路径：run 返回 0 且 harvest 命中 → True；并带 cwd 与 timeout。"""
+    _stub_venv(monkeypatch)
     seen = {}
 
     def fake_run(cmd, **kw):
