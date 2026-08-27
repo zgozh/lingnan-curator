@@ -106,3 +106,66 @@ def test_pid_slug_safe_chars_only(workspace, monkeypatch):
     import re
 
     assert re.fullmatch(r"[A-Za-z0-9_\-]+", r.json()["photo_id"])
+
+
+# ---------- 批量抓取 Web 端 ----------
+
+def _crawl_client(workspace, monkeypatch, fake_rows, logs=None):
+    c = _client(monkeypatch)
+    from app.ingest import sources
+
+    monkeypatch.chdir(workspace)
+    captured = {}
+
+    def fake_run(name, query, limit, location, raw_dir):
+        captured.update(name=name, query=query, limit=limit)
+        return fake_rows, (logs or [])
+
+    monkeypatch.setattr(sources, "run_source", fake_run)
+    return c, captured
+
+
+def test_crawl_api_job_lifecycle(workspace, monkeypatch):
+    row = {"photo_id": "commons_ok_00001", "title": "OK 图",
+           "year": "1910", "location": "", 
+           "source_url": "https://c.org/ok",
+           "license": "Public domain"}
+    c, cap = _crawl_client(workspace, monkeypatch, [row])
+    r = c.post("/api/crawl", json={"query": "Canton 1910", "limit": 1,
+                                   "source": "commons", "location": "广州"})
+    assert r.status_code == 200
+    jid = r.json()["job_id"]
+    st = None
+    for _ in range(50):                       # 轮询至任务结束
+        st = c.get(f"/api/crawl/status/{jid}").json()
+        if st["done"]:
+            break
+    assert st["done"] and st["rows"][0]["photo_id"] == "commons_ok_00001"
+    assert cap["name"] == "commons" and cap["query"] == "Canton 1910"
+    meta = workspace / "data/raw/meta.csv"
+    assert meta.exists() and "commons_ok_00001" in meta.read_text("utf-8")
+
+
+def test_crawl_api_empty_result_records_log(workspace, monkeypatch):
+    c, _ = _crawl_client(workspace, monkeypatch, [],
+                         logs=["[SKIP] 没有符合条件的公版图"])
+    r = c.post("/api/crawl", json={"query": "nothing here", "limit": 1})
+    jid = r.json()["job_id"]
+    for _ in range(50):
+        st = c.get(f"/api/crawl/status/{jid}").json()
+        if st["done"]:
+            break
+    assert st["rows"] == [] and st["logs"]
+
+
+def test_ingest_batch_validates_and_spawns(workspace, monkeypatch):
+    spawned = []
+    monkeypatch.setattr(wm, "_spawn_ingest_batch",
+                        lambda pids: spawned.append(pids))
+    c = _client(monkeypatch)
+    r = c.post("/api/ingest-batch",
+               json={"pids": ["a_b_1", "../evil", "bad.dot", "ok_2"]})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["queued"] == ["a_b_1", "ok_2"]
+    assert len(body["rejected"]) == 2 and spawned == [["a_b_1", "ok_2"]]

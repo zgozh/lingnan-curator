@@ -11,6 +11,14 @@ function bubble(cls, html) {
   return div;
 }
 
+// 示例问题：点击即代填并提交
+document.querySelectorAll("#ask-examples .chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    input.value = chip.textContent;
+    form.requestSubmit();
+  });
+});
+
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const q = input.value.trim();
@@ -58,5 +66,13 @@ form.addEventListener("submit", async (e) => {
       .map((p) => `<a href="/photo/${p}"><img src="/media/${p}/restored.jpg"
         onerror="this.style.display='none'"></a>`).join("");
     log.appendChild(photos);
+    const cites = bubble("hint", `依据 ${meta.photo_ids.length} 张馆藏照片`);
+    cites.className = "msg hint";
+  }
+  if (meta?.refused) {
+    box.classList.add("refused");
+    const tip = bubble("hint",
+      "试试改问与馆藏画面相关的内容（人物穿着/建筑/街市生活），或去照片墙看看有哪些藏品～");
+    tip.className = "msg hint";
   }
 });

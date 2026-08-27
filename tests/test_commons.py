@@ -93,18 +93,24 @@ def test_clean_title_drops_suffix():
 
 
 def test_cli_crawl_smoke_writes_meta(tmp_path, monkeypatch):
-    """CLI 骨架冒烟：crawl 子命令把行追加进 meta.csv（网络函数被 mock）。"""
+    """CLI 骨架冒烟：crawl 子命令把行追加进 meta.csv（来源实现被 mock）。"""
     import csv
     import io
 
     from app import cli
+    from app.ingest import sources
 
     monkeypatch.chdir(tmp_path)
     row = {"photo_id": "commons_x_00001", "title": "X",
-           "year": "1910", "location": "", 
+           "year": "1910", "location": "",
            "source_url": "https://c.org/x", "license": "CC0"}
-    monkeypatch.setattr(cc, "crawl",
-                        lambda *a, **k: [row])
+    captured = {}
+
+    def fake_run_source(name, query, limit, location, raw_dir):
+        captured["name"] = name
+        return [row], []
+
+    monkeypatch.setattr(sources, "run_source", fake_run_source)
     buf = io.StringIO()
     try:
         import contextlib
@@ -113,6 +119,7 @@ def test_cli_crawl_smoke_writes_meta(tmp_path, monkeypatch):
             cli.main(["crawl", "--query", "q", "--limit", "1"])
     finally:
         pass
+    assert captured["name"] == "commons"      # 默认 Commons
     meta = tmp_path / "data/raw/meta.csv"
     assert meta.exists()
     ids = {r["photo_id"] for r in csv.DictReader(

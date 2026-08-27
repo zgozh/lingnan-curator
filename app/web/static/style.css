@@ -76,3 +76,8 @@ pre.ocr { background:#fff; border:1px dashed var(--line); padding:14px;
 #up-form { display: flex; flex-direction: column; gap: 12px; max-width: 560px; }
 #up-form label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
 #up-form input, #up-form select { padding: 8px 10px; border: 1px solid #cfc6b8; border-radius: 6px; }
+
+/* 抓取页与问答页补充 */
+.msg.refused { color: #8a5a44; background: #fff6ec; border-left: 3px solid #d9b48f; }
+.crawl-tb { border-collapse: collapse; margin: 10px 0; font-size: 14px; }
+.crawl-tb th, .crawl-tb td { border: 1px solid #e2dacb; padding: 6px 10px; text-align: left; }

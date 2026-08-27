@@ -27,9 +27,13 @@ def cmd_ingest(args) -> None:
     for e in errors:
         print(f"[拒收] {e}", file=sys.stderr)
     if getattr(args, "pid", ""):
-        records = [r for r in records if r.photo_id == args.pid]
+        wanted = {p.strip() for p in args.pid.split(",") if p.strip()}
+        records = [r for r in records if r.photo_id in wanted]
+        missing = wanted - {r.photo_id for r in records}
         if not records:
             raise SystemExit(f"[NG] meta.csv 中不存在 photo_id={args.pid}")
+        for m in sorted(missing):
+            print(f"[SKIP] meta.csv 中不存在 photo_id={m}", file=sys.stderr)
     if args.limit > 0:
         records = records[: args.limit]
     print(f"合法 {len(records)} 张，开始入库（Milvus={settings.milvus_uri}）……")
@@ -302,47 +306,25 @@ def cmd_tailor(args) -> None:
 
 
 def cmd_crawl(args) -> None:
-    """Commons 公版图爬取：写 data/raw + 追加 meta.csv（版权红线内置过滤）。"""
+    """多来源公版图抓取（默认 Commons）：写 data/raw + 追加 meta.csv。"""
     from pathlib import Path
 
-    import httpx
-
-    from app.ingest.commons_crawler import _HEADERS, crawl
     from app.ingest.meta import load_meta
+    from app.ingest.sources import run_source
 
     raw = Path("data/raw")
-    with httpx.Client(timeout=60, headers=_HEADERS) as cli:
-        rows = crawl(args.query, args.limit, args.location, cli, raw)
+    rows, logs = run_source(args.source, args.query, args.limit,
+                            args.location, raw)
+    for log in logs:
+        print(log)
     if not rows:
-        print("[NG] 没有符合条件的公版图，试试更换关键词")
+        print("[NG] 没有符合条件的公版图，试试更换关键词或来源")
         return
-    # 直接追加 meta.csv（复用上传通道的追加器保持格式一致）
-    import csv
+    from app.ingest.sources import append_meta_rows
 
-    meta = raw / "meta.csv"
-    meta.parent.mkdir(parents=True, exist_ok=True)
-    header = ["photo_id", "title", "year", "location", "source_url",
-              "license"]
-    existing: set[str] = set()
-    if meta.exists():
-        with open(meta, encoding="utf-8-sig", newline="") as f:
-            existing = {(r.get("photo_id") or "").strip()
-                        for r in csv.DictReader(f)}
-        need_header = False
-    else:
-        need_header = True
-    with open(meta, "a", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=header)
-        if need_header:
-            writer.writeheader()
-        for r in rows:
-            while r["photo_id"] in existing:
-                r["photo_id"] += "_" + __import__("uuid").uuid4().hex[:4]
-            writer.writerow(r)
-            existing.add(r["photo_id"])
-    print(f"完成：{len(rows)} 张入 raw+meta；运行 "
-          f"`uv run python -m app.cli ingest --src data/raw` 入库"
-          f"（或逐张 --pid）")
+    pids = append_meta_rows(rows, raw / "meta.csv")
+    print(f"完成：{len(pids)} 张入 raw+meta；逐张入库："
+          f"`uv run python -m app.cli ingest --pid {','.join(pids)}`")
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -394,8 +376,10 @@ def main(argv: list[str] | None = None) -> None:
     tl.set_defaults(func=cmd_tailor)
 
     cw = sub.add_parser("crawl",
-                        help="Wikimedia Commons 公版图爬取(仅 PD/CC0)")
-    cw.add_argument("--query", required=True, help="检索词，如 Guangzhou 1930")
+                        help="公版图抓取：commons(默认)/openverse，版权红线内置")
+    cw.add_argument("--query", required=True, help="检索词（英文更准）")
+    cw.add_argument("--source", default="commons",
+                    choices=["commons", "openverse"], help="图片来源站")
     cw.add_argument("--limit", type=int, default=10, help="最多抓取张数")
     cw.add_argument("--location", default="", help="meta 地点字段填充值")
     cw.set_defaults(func=cmd_crawl)

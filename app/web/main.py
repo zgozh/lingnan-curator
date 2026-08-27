@@ -218,16 +218,49 @@ def _health_flags() -> dict[str, bool]:
 
 def _spawn_ingest(photo_id: str) -> None:
     """后台子进程跑单张入库管线（不阻塞请求，日志落 data/logs）。"""
+    _spawn_ingest_batch([photo_id])
+
+
+def _spawn_ingest_batch(pids: list[str]) -> None:
+    """一个子进程顺序入库多张（避免多进程挤爆 GPU），日志落 data/logs。"""
     import subprocess
     import sys
 
     log_dir = Path("data/logs")
     log_dir.mkdir(parents=True, exist_ok=True)
-    log = open(log_dir / f"ingest-{photo_id}.log", "w", encoding="utf-8")
+    log = open(log_dir / f"ingest-{'_'.join(pids[:3])}.log",
+               "w", encoding="utf-8")
     subprocess.Popen(
-        [sys.executable, "-m", "app.cli", "ingest", "--pid", photo_id],
+        [sys.executable, "-m", "app.cli", "ingest", "--pid",
+         ",".join(pids)],
         stdout=log, stderr=subprocess.STDOUT, cwd=Path.cwd(),
     )
+
+
+# 抓取任务注册表（单用户 demo：进程内 dict 足够；超量淘汰最旧）
+_CRAWL_JOBS: dict[str, dict] = {}
+_CRAWL_LOCK = None
+
+
+def _crawl_worker(job_id: str, args: dict) -> None:
+    from app.ingest.sources import append_meta_rows, run_source
+
+    job = _CRAWL_JOBS[job_id]
+    try:
+        rows, logs = run_source(args["source"], args["query"],
+                                args["limit"], args["location"],
+                                Path("data/raw"))
+        if rows:
+            # append 可能为撞名加了后缀，按顺序回写最终 pid 供前端引用
+            final = append_meta_rows(rows)
+            for r, p in zip(rows, final):
+                r["photo_id"] = p
+        job.update(done=True, ok=True, rows=rows, logs=logs,
+                   added=len(rows))
+    except Exception as exc:  # noqa: BLE001 —— 任务失败不得打垮服务
+        logger.warning("crawl job %s 失败: %s", job_id, exc)
+        job.update(done=True, ok=False, rows=[], logs=[str(exc)],
+                   added=0)
 
 
 def create_app() -> FastAPI:
@@ -436,6 +469,55 @@ def create_app() -> FastAPI:
         if "/" in photo_id or "\\" in photo_id or "." in photo_id:
             raise HTTPException(400, "非法 photo_id")
         return {"stored": _get_photo(photo_id) is not None}
+
+    # ---------- 批量抓取（多来源） ----------
+    import threading
+    import uuid as _uuid
+
+    @app.get("/crawl")
+    def crawl_page(request: Request):
+        return TEMPLATES.TemplateResponse(request, "crawl.html", {})
+
+    @app.post("/api/crawl")
+    async def api_crawl(request: Request):
+        body = await request.json()
+        query = str(body.get("query") or "").strip()
+        if not query:
+            raise HTTPException(400, "缺少检索词")
+        source = body.get("source") or "commons"
+        limit = min(max(int(body.get("limit") or 5), 1), 12)
+        location = str(body.get("location") or "").strip()[:24]
+        job_id = _uuid.uuid4().hex[:8]
+        while len(_CRAWL_JOBS) > 20:
+            _CRAWL_JOBS.pop(next(iter(_CRAWL_JOBS)))
+        _CRAWL_JOBS[job_id] = {"done": False, "ok": False, "rows": [],
+                               "logs": [], "added": 0}
+        threading.Thread(target=_crawl_worker, daemon=True,
+                         args=(job_id, {"source": source, "query": query,
+                                        "limit": limit,
+                                        "location": location})).start()
+        return {"ok": True, "job_id": job_id}
+
+    @app.get("/api/crawl/status/{job_id}")
+    def api_crawl_status(job_id: str):
+        job = _CRAWL_JOBS.get(job_id)
+        if not job:
+            raise HTTPException(404, "任务不存在或已被清理")
+        return job
+
+    @app.post("/api/ingest-batch")
+    def api_ingest_batch(body: dict):
+        pids = [str(p) for p in (body.get("pids") or [])]
+        ok, rejected = [], []
+        for p in pids:
+            if _re.fullmatch(r"[A-Za-z0-9_\-]+", p):
+                ok.append(p)
+            else:
+                rejected.append(p)
+        if not ok:
+            raise HTTPException(400, "没有合法的 photo_id 可入库")
+        _spawn_ingest_batch(ok)
+        return {"ok": True, "queued": ok, "rejected": rejected}
 
     @app.post("/api/ask")
     async def api_ask(request: Request):

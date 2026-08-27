@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}批量抓取 · 湾区记忆{% endblock %}
+{% block body %}
+<h1>批量抓取公版图</h1>
+<p class="hint">自动从公开版权图库抓老照片并写入著录；许可不符合「Public domain / CC0」的图片会被直接跳过（版权红线）。
+抓取完成后点「入库」跑修复→上色→AI著录管线，每张约 1-2 分钟。</p>
+
+<form id="crawl-form" class="searchbar" style="flex-wrap:wrap;gap:8px">
+  <label class="hint">来源
+    <select id="crawl-source">
+      <option value="commons">Wikimedia Commons 维基共享（推荐）</option>
+      <option value="openverse">Openverse 聚合图库</option>
+    </select>
+  </label>
+  <input id="crawl-query" placeholder="检索词（英文更准）：Canton Guangzhou 1930"
+         required size="34">
+  <input id="crawl-location" placeholder="地点标签：广州" size="8">
+  <select id="crawl-limit">
+    <option value="3">3 张</option>
+    <option value="5" selected>5 张</option>
+    <option value="10">10 张</option>
+  </select>
+  <button type="submit" id="crawl-btn">开始抓取</button>
+</form>
+<div id="crawl-status" class="hint"></div>
+<div id="crawl-results"></div>
+{% endblock %}
+{% block scripts %}<script src="/static/crawl.js" defer></script>{% endblock %}
