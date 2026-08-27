@@ -41,16 +41,15 @@ def cmd_ingest(args) -> None:
 
 
 def cmd_narrate(args) -> None:
-    """F6 口播预生成：讲解词→TTS 音频（SadTalker 视频待 T4 就绪后接入）。"""
-    from app.agents.narrator import narrate
+    """F6 口播预生成：跑完整叙事链（故事→粤语旁白→TTS 音频）。"""
+    from app.narrator.story import run_story_chain
 
-    result = narrate(args.pid)
-    if result.get("error"):
-        raise SystemExit(f"narrate 失败: {result['error']}")
-    state = "OK" if result["audio"] else "DEGRADED(无音频)"
-    print(f"[{state}] {args.pid} voice={result.get('voice')} "
-          f"-> data/processed/{args.pid}/narration.wav")
-    print(f"讲解词：{result.get('script', '')[:80]}…")
+    res = run_story_chain(args.pid, force=args.force)
+    if res.get("audio"):
+        print(f"[OK] {args.pid} 叙事+旁白+音频完成 "
+              f"(story={len(res.get('story', ''))}字, degraded={res.get('degraded')})")
+    else:
+        print(f"[NG] {args.pid} 叙事完成但音频降级 degraded={res.get('degraded')}")
 
 
 def _ask(question: str, settings=None) -> dict:
@@ -165,6 +164,7 @@ def main(argv: list[str] | None = None) -> None:
 
     na = sub.add_parser("narrate", help="口播预生成：讲解词→粤语 TTS 音频")
     na.add_argument("--pid", required=True, help="photo_id")
+    na.add_argument("--force", action="store_true", help="忽略已有缓存强制重生成")
     na.set_defaults(func=cmd_narrate)
 
     ev = sub.add_parser("eval", help="RAGAS 评测：批量问答→指标→报告")

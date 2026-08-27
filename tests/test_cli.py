@@ -33,3 +33,39 @@ def test_ingest_runs_with_defaults(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "_ingest_flow", fake_run)
     main(["ingest", "--src", str(tmp_path)])
     assert seen["n"] == 1
+
+
+def test_narrate_ok(monkeypatch):
+    """T11：narrate 跑完整叙事链，pid 透传、音频成功→[OK]。"""
+    import app.narrator.story as story_mod
+
+    calls = {}
+
+    def fake_run(pid, settings=None, force=False):
+        calls["pid"] = pid
+        calls["force"] = force
+        return {"story": "故事", "narration": "{}", "audio": True, "degraded": False}
+
+    monkeypatch.setattr(story_mod, "run_story_chain", fake_run)
+    main(["narrate", "--pid", "sample_a"])
+    assert calls["pid"] == "sample_a"
+    assert calls["force"] is False
+
+
+def test_narrate_ng_degraded(monkeypatch, capsys):
+    """T11：音频降级→[NG]，且 --force 透传给 run_story_chain。"""
+    import app.narrator.story as story_mod
+
+    calls = {}
+
+    def fake_run(pid, settings=None, force=False):
+        calls["pid"] = pid
+        calls["force"] = force
+        return {"story": "故事", "narration": "{}", "audio": False, "degraded": True}
+
+    monkeypatch.setattr(story_mod, "run_story_chain", fake_run)
+    main(["narrate", "--pid", "sample_a", "--force"])
+    captured = capsys.readouterr()
+    assert calls["pid"] == "sample_a"
+    assert calls["force"] is True
+    assert captured.out.startswith("[NG]")
