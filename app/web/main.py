@@ -15,6 +15,7 @@ from fastapi.templating import Jinja2Templates
 from app.agents import creator, curator, docent, narrator
 from app.infra import reranker as rr
 from app.infra.tts import VOICES
+from app.narrator.story import run_story_chain
 from app.retrieval import pipeline as rpipe
 
 logger = logging.getLogger(__name__)
@@ -120,6 +121,14 @@ def create_app() -> FastAPI:
         if row is None:
             raise HTTPException(404, "馆藏中不存在该照片")
         base = Path("data/processed") / photo_id
+        # 叙事链：幂等（已生成→缓存即返；未生成→首次触发生成），任何环节失败已降级不抛。
+        chain = run_story_chain(photo_id)
+        try:
+            narr = json.loads(chain.get("narration") or "{}")
+            narration_lines = narr.get("lines", [])
+        except Exception:  # noqa: BLE001 —— 旁白解析失败按空处理，不打垮页面
+            narration_lines = []
+        story_text = chain.get("story", "")
         return TEMPLATES.TemplateResponse(
             request, "detail.html",
             {"p": row, "pid": photo_id,
@@ -129,7 +138,11 @@ def create_app() -> FastAPI:
              "has_narration": (base / "narration.wav").exists(),
              "has_video": (base / "narration.mp4").exists(),
              "voices": VOICES,
-             "tts_voice": _settings().tts_voice},
+             "tts_voice": _settings().tts_voice,
+             "story": story_text,
+             "narration_lines": narration_lines,
+             "chain_degraded": chain.get("degraded", False),
+             "chain_audio": chain.get("audio", False)},
         )
 
     @app.get("/exhibit")

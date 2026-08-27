@@ -28,6 +28,15 @@
 | `app.web` | F7 页面渲染 + SSE + 静态资产 | 不 import 模型客户端；只调 retrieval/agents |
 | `app.eval` | F8：RAGAS 评测执行与报告落盘 | 只读评测集，不改库 |
 
+### narrator 分层（叙事链，重构后）
+
+`app/narrator` 把口播从"元数据拼讲解词"升级为一条 4-Agent 叙-链（ADR-0010）：
+`VLM 洞察 → qwen-max 故事 → qwen-plus 旁白 → qwen-plus 审稿 →（score<85 回炉，≤1 次）→ CosyVoice TTS 按句合成`。
+各 Agent 是纯函数单元，提示词集中于 `app/narrator/prompts.py`，"AI 味"拦截做成不依赖 LLM 的
+确定性硬闸（`app/narrator/detox.py`：禁用词扫描 + 结构校验）。CLI（`cmd_narrate`）与 Web
+（`photo_page` 调 `run_story_chain(photo_id)`）共用同一编排器；编排器幂等（产物缓存），任何一环
+失败只降级（`degraded`/`audio` 标记）、绝不上抛异常。
+
 ## 依赖规则
 - 上层可依赖下层，禁止反向：`web/cli → agents/narrator/eval → retrieval → infra → config`
 - `retrieval` 不得 import `agents`/`web`（保证检索可独立测试）

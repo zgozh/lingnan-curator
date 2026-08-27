@@ -26,6 +26,23 @@
   <p>{{ p.caption or '（暂无）' }}</p>
 </section>
 
+<section class="storyblock">
+  <h2>故事 / 旁白</h2>
+  {% if story %}
+  <p class="story-text">{{ story }}</p>
+  {% endif %}
+  {% if narration_lines %}
+  <ol class="narration-lines">
+    {% for ln in narration_lines %}
+    <li class="narration-line" data-emotion="{{ ln.emotion }}">{{ ln.text }}</li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+  {% if not story and not narration_lines %}
+  <p class="hint">（该张暂未生成叙事；可点击下方“生成讲解音频”触发。）</p>
+  {% endif %}
+</section>
+
 {% set narration = namespace(exists=False) %}
 <section class="narration">
   <h2>粤语讲解 <small class="hint">（当前：{{ tts_voice }}）</small></h2>

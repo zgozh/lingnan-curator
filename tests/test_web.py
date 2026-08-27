@@ -18,6 +18,14 @@ def _client(monkeypatch, *, milvus_ok=True) -> TestClient:
             "photo_id": "sample_a", "score": 0.9, "title": "骑楼A",
             "year": "1930", "location": "广州", "caption": "老街"})()],
             "degraded": set()})())
+    # 详情页会拉叙事链；必须 mock，否则真实加载会触发在线 LLM 链而挂起/失败。
+    monkeypatch.setattr(
+        wm, "run_story_chain",
+        lambda *a, **k: {
+            "story": "一个广州的老故事。",
+            "narration": '{"lines":[{"text":"旁白","emotion":"怀念"}]}',
+            "audio": True, "degraded": False},
+    )
     return TestClient(wm.create_app())
 
 
@@ -140,3 +148,16 @@ def test_detail_always_has_narration_audio_element(monkeypatch):
     c = _client(monkeypatch)
     body = c.get("/photo/sample_a").text
     assert 'id="narration-audio"' in body
+
+
+def test_detail_renders_story_and_narration(monkeypatch):
+    """详情页应透传 run_story_chain 返回的故事文本 + 逐句旁白（含 emotion）。"""
+    monkeypatch.setattr(wm, "_get_photo",
+                        lambda pid, settings=None: {
+                            "photo_id": pid, "title": "骑楼A",
+                            "caption": "c", "has_colorized": 0})
+    c = _client(monkeypatch)
+    body = c.get("/photo/sample_a").text
+    assert "一个广州的老故事。" in body
+    assert "旁白" in body
+    assert 'data-emotion="怀念"' in body

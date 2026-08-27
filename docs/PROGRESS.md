@@ -11,6 +11,20 @@
   （24 候选 19s→1.0s）；检索精排全程在线不降级
 - 下一步：**W4 = 申报书 PDF + 演示视频**（素材：本语料库 + eval/reports 数字进答辩 PPT）
 
+## W4 执行记录（2026-08-26 叙事模型重构）
+- **叙事链重构完成（ADR-0010）**：口播从"元数据拼讲解词"升级为 4-Agent 链——
+  VLM 洞察→qwen-max 情感微故事→qwen-plus 粤语旁白→qwen-plus 一致性审稿，
+  审稿 score<85 单点回炉（≤1 次）；`app/narrator/detox.py` 做确定性"AI 味"拦截硬闸
+  （禁用词扫描 + 结构校验），不依赖 LLM。
+- **TTS 按句合成 ✅**：旁白按句合成再拼接成正确 WAV（21386 节奏可控），CosyVoice 主路 +
+  本地 Edge-TTS zh-HK 作可选 Provider（复用 ADR-0007 的 TTSProvider seam）。
+- **叙事质量评测 ✅**：四维 judge（factual/taste/faithful/engaging）+ 禁用词统计；
+  评测集按真实语料重写（15 应答 + 5 拒答）。
+- **Web 详情页叙事展示 ✅（本任务）**：`photo_page` 调幂等的 `run_story_chain(photo_id)`，
+  透传 `story` / `narration_lines` / `chain_degraded` / `chain_audio`；`detail.html` 渲染
+  "故事 / 旁白" 区块（故事段落 + 逐句旁白 `<li data-emotion>`）；音频复用既有
+  `id="narration-audio"` 节点。`tests/test_web.py` mock `run_story_chain` 防触发在线链。
+
 ## 指标爬坡记录（同代码下的关键修复）
 | 版本动作 | faithfulness | answer_relevancy |
 |---|---|---|
@@ -127,6 +141,7 @@
 - ADR-0007 粤语 TTS = TTSProvider 接口 + DashScope/Azure/本地Yue 三路试听定稿
 - ADR-0008 口型 = SadTalker（EchoMimicV2 出局/LivePortrait 排除）
 - ADR-0009 评测 = ragas + DashScope judge
+- ADR-0010 叙事生成 = 4-Agent 链 + 确定性去AI味拦截 + 云端 API（本文档对应执行记录）
 
 ## 验证命令 / 冒烟记录
 - 暂无代码，冒烟未开始。首次冒烟目标：W1 末——3 张真实样张端到端入库。
