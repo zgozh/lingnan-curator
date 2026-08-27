@@ -145,3 +145,12 @@
 
 ## 验证命令 / 冒烟记录
 - 暂无代码，冒烟未开始。首次冒烟目标：W1 末——3 张真实样张端到端入库。
+
+## 近期单元执行记录（231-240 测试基线）
+- E2 保脸上色链：YCbCr 亮度保结构合成（LRU: Y=本地/色度=云端），description_edit 永久禁用
+- ADR-0011 增补：上色增强候选只落 enhanced-archive 待审区，人工 /review 启用才上线
+- 比稿评审流：tailor_prompt 定制色彩提示 + /review 三列比稿页（启用=移动转正/撤下=归档回退）
+- 提示词 v2：场景分类（室内禁天空水面词+暖色骨架+冷蓝绿禁忌+信息不足兜底），棺材铺内景饱和度 14.5%→45.5%
+- 修复：首页/检索缩略图模板变量错位（占位图假死）、docent 流式吐 JSON 改纯文本契约、专题展示例主题 chips
+- 数据输入 A：Web 上传通道 /upload（license/source_url 版权红线必填校验+PIL 真伪嗅探+20MB 上限+自动 pid 去重）→ ingest --pid 单张后台管线 → store-status 轮询跳详情
+- 数据输入 B：Commons 公版图爬虫 app/ingest/commons_crawler.py（仅 PD/CC0 白名单过滤、合规 UA 过机器人政策 403、单条失败降级）；CLI crawl --query --limit --location；实测抓通 Canton 1910 两张
