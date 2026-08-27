@@ -6,6 +6,41 @@
 
 ---
 
+## 第〇步：出发前的准备清单（按你要当的角色选一种）
+
+### 🖼 角色 A｜只想看图听音频读文档（最省事，零安装）
+- 任意电脑均可（Windows/macOS/翻看 HTML 用浏览器）
+- 能解压 630MB 压缩包的磁盘空间约 **2 GB**
+- 若要点开 meta.csv 里的 Wikimedia 链接溯源，需要能访问外网的浏览器
+- **就这些，直接看下面"第一步"**
+
+### ⚙️ 角色 B｜完整体验 Web 展馆（跑检索问答文创口播）
+| 项目 | 要求 |
+|---|---|
+| 显卡 | **NVIDIA GPU 显存 ≥8GB**（RTX 3060 及以上级别） |
+| 系统 | Windows 10/11 x64 |
+| 磁盘 | 空闲 ≥ **40GB**（venv≈7GB + 模型权重≈10GB + 数据/Milvus 卷若干） |
+| NVIDIA 驱动 | 更新到最新 Game Ready / Studio 版（CUDA 运行时由 torch cu126 自带，**无需装 CUDA Toolkit**） |
+| uv 包管理器 | PowerShell 执行：`irm https://astral.sh/uv/install.ps1 \| iex`（Python 3.12 它会自动装） |
+| Docker Desktop | docker.com 下载装好后启动一次（用于 Milvus 容器） |
+| **DashScope API Key** | 自己到 阿里云百炼 bailian.aliyun.com 开通并创建——**发布包不含密钥，不能共用别人的**。开条目 billed 极低：本次开发全程 LLM+VLM+TTS 总花费约 ¥30 以内，单人测试预计 <¥5 |
+| 网络 | HuggingFace 权重走国内镜像免代理自动下载（首次约 8~10GB，建议挂机一晚）；Wikimedia/Openverse 抓取直连可用 |
+
+⚠️ 已知边界：本包为体积原因未携带本地视觉 vendor 环境（CodeFormer/DDColor 仓库与独立 venv）。入库时修复步骤会**优雅跳过并标记 degraded**，上色自动回退从 HF 镜像下载模型——馆照常建得起来，只是修复质量略逊于作者原机。
+
+### 🧪 角色 C｜只验证代码质量（无 GPU 无密钥，5 分钟）
+- 安装 uv（命令同上）、磁盘 5GB（拉 torch cu126 轮子）
+- 然后：`uv sync` → `uv run pytest tests -q` 应输出 **245 passed**
+
+## 📝 测试反馈怎么给
+
+发现问题请附上三样：
+1. 做了什么操作 / 访问了哪个页面；
+2. 终端或浏览器报错截图；
+3. `data/logs/` 下对应日志文件（上传/抓取产生的入库日志按 pid 命名）。
+
+---
+
 ## 第一步：什么都不装，5 分钟看完核心成果
 
 ### ① 双击根目录的 `预览.html`
