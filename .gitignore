@@ -61,6 +61,7 @@ data/processed/*/.vendor-*
 data/processed/*/compare/
 data/processed/*/compare2/
 data/processed/*/compare3/
+data/processed/*/narration.mp4
 data/processed/*/enhanced-archive/
 data/processed/*/tts-*.wav
 
