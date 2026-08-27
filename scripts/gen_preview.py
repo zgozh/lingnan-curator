@@ -63,9 +63,9 @@ with open(META, encoding="utf-8-sig", newline="") as f:
             rows.append((pid, r, best))
 
 pick_html = "".join(
-    card(p, r, b, "../data/processed")
+    card(p, r, b, "data/processed")
     for p, r, b in rows if p in PICKS)
-grid_html = "".join(card(p, r, b, "../data/processed") for p, r, b in rows)
+grid_html = "".join(card(p, r, b, "data/processed") for p, r, b in rows)
 
 html = f"""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -115,4 +115,12 @@ border-radius:8px;overflow:hidden;border:1px solid #e4dcd0}}
 """
 out = ROOT / "预览.html"
 out.write_text(html, encoding="utf-8")
-print(f"[OK] 预览.html 已生成：{len(rows)} 张卡片（必看 {sum(1 for p, _, _ in rows if p in PICKS)} 张）")
+
+# 自校验：页面里引用的每张图必须真实存在于磁盘（file:// 相对路径可用）
+import re
+
+refs = re.findall(r'(?:src|href)="(data/processed/[^"]+)"', html)
+missing = [r_ for r_ in refs if not (ROOT / r_).exists()]
+assert not missing, f"预览页引用了 {len(missing)} 个不存在的文件: {missing[:3]}"
+print(f"[OK] 预览.html 已生成：{len(rows)} 张卡片（必看 {sum(1 for p, _, _ in rows if p in PICKS)} 张）；"
+      f"引用资源 {len(refs)} 条全部存在")
