@@ -42,7 +42,8 @@ def test_synthesize_lines_concatenates(monkeypatch, tmp_path):
         {"text": "第一句", "emotion": "怀念"},
         {"text": "第二句", "emotion": "平静"},
     ]
-    assert tts.synthesize_lines(lines, out, settings=None) is True
+    assert tts.synthesize_lines(lines, out,
+                                settings=Settings(dashscope_api_key="test-key")) is True
     assert out.exists()
     with wave.open(str(out), "rb") as w:
         assert w.getnchannels() == 1
