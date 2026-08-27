@@ -179,6 +179,56 @@ def cmd_zh_titles(args) -> None:
     print(f"完成：{len(mapping)} 条 -> {out}（改写 {n_changed} 条）")
 
 
+def cmd_refine(args) -> None:
+    """云端精修：万相 imageedit 超分/修复 → 副产物 refined/repaired.jpg。
+
+    只产出新文件，绝不覆盖 restored/colorized 主产物（保真红线）。
+    """
+    from pathlib import Path
+
+    from app.config import Settings
+    from app.infra.artifact import pick_background
+    from app.ingest.cloud_refine import (
+        MODEL, refine_image,
+    )
+
+    s = Settings.load()
+    fn = {"sr": ("super_resolution", "refined.jpg"),
+          "repair": ("description_edit", "repaired.jpg")}[args.function]
+    function, out_name = fn
+
+    if args.pid:
+        pids = [args.pid]
+    else:                                # --all：全量馆藏（用 Milvus 著录）
+        from app.infra.milvus_store import get_client
+
+        rows = get_client(s).query(
+            collection_name=s.collection, filter='photo_id != ""',
+            output_fields=["photo_id"], limit=1000)
+        pids = [str(r.get("photo_id")) for r in rows]
+    print(f"云端精修 model={MODEL} function={function} 待处理 {len(pids)} 张")
+    ok_n = 0
+    for pid in pids:
+        d = Path("data/processed") / pid
+        bg = pick_background(d)
+        if bg is None:
+            print(f"[NG] {pid}: 无本地底图(restored/colorized)，跳过")
+            continue
+        dst = d / out_name
+        if dst.exists() and not args.force:
+            print(f"[OK] {pid}: 已有 {out_name}，跳过(--force 重跑)")
+            ok_n += 1
+            continue
+        t0 = __import__("time").time()
+        okc = refine_image(bg, dst, function=function, settings=s)
+        tag = "OK" if okc else "NG"
+        if okc:
+            ok_n += 1
+        print(f"[{tag}] {pid}: {out_name} "
+              f"({__import__('time').time() - t0:.0f}s)")
+    print(f"完成 {ok_n}/{len(pids)}；副产物仅供人工比对采纳，未改主产物")
+
+
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="lingnan", description="岭南非遗 AI 策展人")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -201,6 +251,15 @@ def main(argv: list[str] | None = None) -> None:
                         help="标题中文化：批量提炼馆藏档案名→titles-zh.json")
     zt.add_argument("--limit", type=int, default=0, help="只处理前 N 条(0=全部)")
     zt.set_defaults(func=cmd_zh_titles)
+
+    rf = sub.add_parser("refine",
+                        help="云端精修：万相超分/修复→副产物图(不覆盖主产物)")
+    rf.add_argument("--pid", default="", help="单张 photo_id；与 --all 二选一")
+    rf.add_argument("--all", action="store_true", help="全量馆藏")
+    rf.add_argument("--function", choices=("sr", "repair"), default="sr",
+                    help="sr=超分保真(默认)；repair=划痕霉斑修复(需人工审)")
+    rf.add_argument("--force", action="store_true", help="重跑已有副产物")
+    rf.set_defaults(func=cmd_refine)
 
     for name in ("serve",):
         sp = sub.add_parser(name)
