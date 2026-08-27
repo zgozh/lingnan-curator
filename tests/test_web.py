@@ -161,3 +161,30 @@ def test_detail_renders_story_and_narration(monkeypatch):
     assert "一个广州的老故事。" in body
     assert "旁白" in body
     assert 'data-emotion="怀念"' in body
+
+
+def test_detail_passes_row_to_story_chain(monkeypatch):
+    """详情页必须把 fetch 到的 row 原样传入 run_story_chain。
+
+    否则 run_story_chain 内部 _metadata_desc(row) 拿不到元数据，
+    故事生成会退化为"一张岭南老照片"。
+    """
+    row = {"photo_id": "sample_a", "title": "骑楼A", "year": "1930",
+           "location": "广州", "caption": "老街", "has_colorized": 0}
+    monkeypatch.setattr(wm, "_get_photo", lambda pid, settings=None: row)
+    c = _client(monkeypatch)
+    captured = {}
+
+    def fake_chain(photo_id, **kwargs):
+        captured.update(photo_id=photo_id, kwargs=kwargs)
+        return {"story": "一个广州的老故事。", "narration": "{}",
+                "audio": False, "degraded": False}
+
+    # 覆盖 _client 里的默认 mock，改为捕获 kwargs（_client 已 built TestClient，
+    # 但 photo_page 在请求时按模块全局查找 run_story_chain，故此处仍生效）。
+    monkeypatch.setattr(wm, "run_story_chain", fake_chain)
+    r = c.get("/photo/sample_a")
+    assert r.status_code == 200
+    assert captured["photo_id"] == "sample_a"
+    # row 必须是 _get_photo 返回的同一 dict，而不是被吞掉/置空
+    assert captured["kwargs"].get("row") is row

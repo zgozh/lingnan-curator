@@ -122,7 +122,9 @@ def create_app() -> FastAPI:
             raise HTTPException(404, "馆藏中不存在该照片")
         base = Path("data/processed") / photo_id
         # 叙事链：幂等（已生成→缓存即返；未生成→首次触发生成），任何环节失败已降级不抛。
-        chain = run_story_chain(photo_id)
+        # 关键：必须把已 fetch 的 row 传入，否则 _metadata_desc(row) 拿不到元数据，
+        # 故事生成会退化为"一张岭南老照片"。
+        chain = run_story_chain(photo_id, row=row)
         try:
             narr = json.loads(chain.get("narration") or "{}")
             narration_lines = narr.get("lines", [])
