@@ -71,3 +71,8 @@ pre.ocr { background:#fff; border:1px dashed var(--line); padding:14px;
 .review-grid figure { margin: 0; }
 .review-grid img { width: 100%; border: 1px solid #d8cfc2; border-radius: 6px; display: block; }
 .review-grid figcaption { font-size: 13px; color: #7a7168; margin-top: 4px; }
+
+/* 上传表单 */
+#up-form { display: flex; flex-direction: column; gap: 12px; max-width: 560px; }
+#up-form label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+#up-form input, #up-form select { padding: 8px 10px; border: 1px solid #cfc6b8; border-radius: 6px; }

@@ -5,10 +5,13 @@
 """
 import json
 import logging
+import re as _re
 import time
+from io import BytesIO
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import (FastAPI, File, Form, HTTPException, Request,
+                     UploadFile)
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -213,6 +216,20 @@ def _health_flags() -> dict[str, bool]:
     return dict(flags)
 
 
+def _spawn_ingest(photo_id: str) -> None:
+    """后台子进程跑单张入库管线（不阻塞请求，日志落 data/logs）。"""
+    import subprocess
+    import sys
+
+    log_dir = Path("data/logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log = open(log_dir / f"ingest-{photo_id}.log", "w", encoding="utf-8")
+    subprocess.Popen(
+        [sys.executable, "-m", "app.cli", "ingest", "--pid", photo_id],
+        stdout=log, stderr=subprocess.STDOUT, cwd=Path.cwd(),
+    )
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="湾区记忆·岭南非遗 AI 策展人")
     media = Path("data/processed").resolve()
@@ -322,6 +339,103 @@ def create_app() -> FastAPI:
         archive.mkdir(parents=True, exist_ok=True)
         live.rename(archive / f"withdrawn-{stamp}-enhanced.jpg")
         return {"ok": True}
+
+    # ---------- 上传通道（数据输入） ----------
+    _ALLOWED_EXT = {".jpg", ".jpeg", ".png"}
+    _META_PATH = Path("data/raw/meta.csv")
+    _RAW_DIR = Path("data/raw")
+
+    @app.get("/upload")
+    def upload_page(request: Request):
+        return TEMPLATES.TemplateResponse(request, "upload.html", {})
+
+    def _append_meta(row: dict) -> None:
+        """追加一行著录；文件缺失时自动补表头；pid 撞车自动加后缀去重。"""
+        import csv
+        import uuid as _uuid
+
+        _META_PATH.parent.mkdir(parents=True, exist_ok=True)
+        header = ["photo_id", "title", "year", "location",
+                  "source_url", "license"]
+        existing_pids: set[str] = set()
+        if _META_PATH.exists():
+            try:
+                with open(_META_PATH, encoding="utf-8-sig", newline="") as f:
+                    existing_pids = {(r.get("photo_id") or "").strip()
+                                     for r in csv.DictReader(f)}
+            except Exception:  # noqa: BLE001
+                pass
+        while row["photo_id"] in existing_pids:
+            row["photo_id"] += "_" + _uuid.uuid4().hex[:4]
+        with open(_META_PATH, "a", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=header)
+            if not existing_pids:
+                writer.writeheader()
+            writer.writerow(row)
+
+    @app.post("/api/upload")
+    async def api_upload(
+        title: str = Form(""),
+        year: str = Form(""),
+        location: str = Form(""),
+        license: str = Form(""),
+        source_url: str = Form(""),
+        file: UploadFile | None = File(None),
+    ):
+        """版权红线：title/license/source_url 必填；仅 jpg/png；自动 pid。"""
+        import uuid
+
+        if file is None or not (file.filename or "").strip():
+            raise HTTPException(400, "缺少图片文件")
+        ext = Path(file.filename).suffix.lower()
+        if ext not in _ALLOWED_EXT:
+            raise HTTPException(400, "仅支持 jpg/jpeg/png 文件")
+        title = title.strip()
+        license_ = license.strip()
+        source_url = source_url.strip()
+        if not title:
+            raise HTTPException(400, "标题必填")
+        if not license_:
+            raise HTTPException(
+                400, "许可协议(License)必填——版权红线，缺者拒绝入库")
+        if not source_url.startswith(("http://", "https://")):
+            raise HTTPException(
+                400, "来源链接(source_url)必填且须为 http(s) 地址")
+
+        from PIL import Image as PILImage
+
+        raw_bytes = await file.read()
+        if len(raw_bytes) > 20 * 1024 * 1024:
+            raise HTTPException(400, "图片超过 20MB 上限")
+        try:
+            img = PILImage.open(BytesIO(raw_bytes))
+            if (img.format or "").upper() not in ("JPEG", "PNG"):
+                raise ValueError(f"格式 {img.format} 不支持")
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(400, f"不是有效的 JPG/PNG 图片：{exc}") from exc
+
+        slug = _re.sub(r"[^0-9a-zA-Z]+", "_", title).strip("_").lower()[:24]
+        if not slug:
+            slug = "photo"
+        photo_id = f"user_{slug}_{uuid.uuid4().hex[:6]}"
+        dest = _RAW_DIR / f"{photo_id}{ext}"
+        _RAW_DIR.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(raw_bytes)
+        _append_meta({
+            "photo_id": photo_id, "title": title,
+            "year": year.strip(), "location": location.strip(),
+            "source_url": source_url, "license": license_,
+        })
+        _spawn_ingest(photo_id)
+        return {"ok": True, "photo_id": photo_id,
+                "status_url": f"/api/store-status/{photo_id}"}
+
+    @app.get("/api/store-status/{photo_id}")
+    def store_status(photo_id: str):
+        """轮询：该照片是否已入库 Milvus（可出现在照片墙）。"""
+        if "/" in photo_id or "\\" in photo_id or "." in photo_id:
+            raise HTTPException(400, "非法 photo_id")
+        return {"stored": _get_photo(photo_id) is not None}
 
     @app.post("/api/ask")
     async def api_ask(request: Request):

@@ -26,6 +26,10 @@ def cmd_ingest(args) -> None:
     records, errors = load_meta(raw / "meta.csv", raw)
     for e in errors:
         print(f"[拒收] {e}", file=sys.stderr)
+    if getattr(args, "pid", ""):
+        records = [r for r in records if r.photo_id == args.pid]
+        if not records:
+            raise SystemExit(f"[NG] meta.csv 中不存在 photo_id={args.pid}")
     if args.limit > 0:
         records = records[: args.limit]
     print(f"合法 {len(records)} 张，开始入库（Milvus={settings.milvus_uri}）……")
@@ -304,6 +308,8 @@ def main(argv: list[str] | None = None) -> None:
     ig = sub.add_parser("ingest", help="入库管线：修复→上色→OCR→描述→向量化→Milvus")
     ig.add_argument("--src", default="data/raw", help="素材目录(含 meta.csv)")
     ig.add_argument("--limit", type=int, default=0, help="只处理前 N 张(0=全部)")
+    ig.add_argument("--pid", default="",
+                    help="只入库指定 photo_id（上传通道用）")
     ig.set_defaults(func=cmd_ingest)
 
     na = sub.add_parser("narrate", help="口播预生成：讲解词→粤语 TTS 音频")

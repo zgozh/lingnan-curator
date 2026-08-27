@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}上传照片 · 湾区记忆{% endblock %}
+{% block body %}
+<h1>上传新馆藏</h1>
+<p class="hint">版权红线：必须填写许可协议与来源链接，否则拒绝入库。
+提交后系统自动跑「修复→上色→OCR→AI著录」管线（约 1-2 分钟），完成后自动跳转详情页。</p>
+
+<form id="up-form">
+  <label>图片文件 *
+    <input type="file" name="file" accept=".jpg,.jpeg,.png" required>
+  </label>
+  <label>标题 * <input name="title" required maxlength="60"
+        placeholder="如：广州西关大屋门楼"></label>
+  <label>年代 <input name="year" maxlength="12" placeholder="如：1930"></label>
+  <label>地点 <input name="location" maxlength="24" placeholder="如：广州"></label>
+  <label>许可协议 * 
+    <select name="license" required>
+      <option value="">— 请选择 —</option>
+      <option>Public domain</option>
+      <option>CC0</option>
+      <option>CC BY 4.0</option>
+      <option>CC BY-SA 4.0</option>
+    </select>
+  </label>
+  <label>来源链接 *
+    <input name="source_url" type="url" required
+           placeholder="https://… （原作页面或你拥有版权的出处）">
+  </label>
+  <button type="submit" id="up-btn">提交并入库</button>
+  <span id="up-status" class="hint"></span>
+</form>
+{% endblock %}
+{% block scripts %}<script src="/static/upload.js" defer></script>{% endblock %}
