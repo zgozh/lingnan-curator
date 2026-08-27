@@ -124,6 +124,8 @@ def build_candidate(
     只落存档区待人工评审，绝不直接顶替线上展示。失败返回 False。
     """
     try:
+        if refine is None:
+            from app.ingest.cloud_refine import refine_image as refine
         root = Path("data/processed") / photo_id
         src = root / "restored.jpg"
         if not src.exists():
