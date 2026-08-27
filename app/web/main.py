@@ -12,7 +12,7 @@ from pathlib import Path
 
 from fastapi import (FastAPI, File, Form, HTTPException, Request,
                      UploadFile)
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -263,11 +263,36 @@ def _crawl_worker(job_id: str, args: dict) -> None:
                    added=0)
 
 
+class _MediaStatic(StaticFiles):
+    """媒体静态服务：restored.jpg 缺失时回退 data/raw 原始扫描件。
+
+    仓库选择性分发策略不含 405MB 的原分辨率 restored 图；克隆/快照路线下
+    详情页滑块底层自动用原始扫描件替代（视觉近似，浏览体验不劣化）。
+    """
+
+    async def get_response(self, path: str, scope):
+        from starlette.exceptions import HTTPException as _StHTTP
+
+        try:
+            return await super().get_response(path, scope)
+        except _StHTTP as exc:
+            if exc.status_code != 404:
+                raise
+            parts = path.replace("\\", "/").split("/")
+            if len(parts) == 2 and parts[1] == "restored.jpg":
+                pid = parts[0]
+                if pid and "." not in pid and "/" not in pid:
+                    for cand in Path("data/raw").glob(f"{pid}.*"):
+                        if cand.suffix.lower() in {".jpg", ".jpeg", ".png"}:
+                            return FileResponse(cand)
+            raise  # 原样上抛 404
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="湾区记忆·岭南非遗 AI 策展人")
     media = Path("data/processed").resolve()
     if media.exists():
-        app.mount("/media", StaticFiles(directory=str(media)), name="media")
+        app.mount("/media", _MediaStatic(directory=str(media)), name="media")
     static_dir = _BASE / "static"
     if static_dir.exists():
         app.mount("/static", StaticFiles(directory=str(static_dir)),

@@ -156,3 +156,9 @@
 - 数据输入 B：Commons 公版图爬虫 app/ingest/commons_crawler.py（仅 PD/CC0 白名单过滤、合规 UA 过机器人政策 403、单条失败降级）；CLI crawl --query --limit --location；实测抓通 Canton 1910 两张
 - 数据输入升级：多来源抓取适配器 sources.py(commons/openverse)+Web 批量抓取页 /crawl(任务轮询+一键入库批次)+ingest --pid 逗号批量；问展馆前端完善(示例问题/拒答引导样式/引用说明)；全链路实测抓取2张并排队入库(e647a20)
 - W4 打包冒烟：ADR-0012 范围修订(数字人视频裁撤/数据通道转正)+README 三测试模式重写；发布包含全部 26 张照片成果与著录，暂存副本内 fresh 解压跑通 245 测试
+
+### 近期单元执行记录（发布工程 + 数据复用）
+- 语料快照机制（ed2c956）：export/load-snapshot 双命令 + 0.9MB corpus.jsonl 随库分发；导入复用先删后插幂等语义；249→251 测试。
+- GitHub 开源发布：git@github.com:zgozh/lingnan-curator.git master 已推（165MB pack，无 >30MB blob）；reflog 尸体清理 pack 631→164.8MB；用户网页端手删维护者章节已 rebase 保留。
+- 媒体回退（本轮）：_MediaStatic 对 restored.jpg 缺失自动回退 data/raw 原始件——修复克隆/快照路线下滑块底层 404 裂图；except 块外引用异常变量的 UnboundLocalError 踩坑。
+- FAQ 补充：全量重跑的 API 计费说明；README 快速开始改为「快照快速路线 / 完整管线路线」双轨。

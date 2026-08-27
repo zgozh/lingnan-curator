@@ -283,3 +283,30 @@ def test_detail_renders_story_and_narration(monkeypatch):
     assert "一个广州的老故事。" in body
     assert "旁白" in body
     assert 'data-emotion="怀念"' in body
+
+
+# ---------- 媒体回退（克隆仓库无 restored.jpg） ----------
+
+def _media_client(monkeypatch, workspace):
+    monkeypatch.chdir(workspace)
+    (workspace / "data/raw").mkdir(parents=True, exist_ok=True)
+    (workspace / "data/raw/sample_a.jpg").write_bytes(b"RAWJPG")
+    (workspace / "data/processed/sample_a").mkdir(parents=True, exist_ok=True)
+    (workspace / "data/processed/sample_a/colorized.jpg").write_bytes(b"COL")
+    monkeypatch.setattr(wm, "_photos_all", lambda: [])
+    monkeypatch.setattr(wm, "_health_flags",
+                        lambda: {"milvus": True, "rerank": False})
+    return __import__("fastapi.testclient", fromlist=["TestClient"]).\
+        TestClient(wm.create_app())
+
+
+def test_media_restored_falls_back_to_raw(tmp_path, monkeypatch):
+    c = _media_client(monkeypatch, tmp_path)
+    r = c.get("/media/sample_a/restored.jpg")
+    assert r.status_code == 200 and r.content == b"RAWJPG"
+
+
+def test_media_unknown_file_still_404(tmp_path, monkeypatch):
+    c = _media_client(monkeypatch, tmp_path)
+    assert c.get("/media/sample_a/ghost.jpg").status_code == 404
+    assert c.get("/media/no_such_pid/colorized.jpg").status_code == 404
