@@ -27,25 +27,6 @@
 
 > 没有 GPU 也能跑完整部署：修复步骤自动跳过（标记 degraded）、上色走 HF 镜像回退、嵌入 CPU 较慢——馆建得起来，质量打折。
 
-## 上传 GitHub / Gitee（维护者操作）
-
-本仓库**已按干净体积设计推送结构**：
-
-- 随库分发约 **165MB** 数据资产（26 张核心成果图、30 条粤语音频、著录 CSV、RAGAS 报告）——克隆者零配置双击 `预览.html` 即可看图听讲
-- 不入库的大件：21.9GB 模型权重（`models/`）、405MB 原分辨率 restored.jpg、53MB 比稿存档 `enhanced-archive/`、落选素材 `_rejected/`——这些仅存在于 zip 发布包或需自行生成
-- 全历史扫描过：**无 >30MB blob**，远低于 GitHub 100MB 与 Gitee 单文件红线
-
-首次推送（网页上各自建好空仓库、**勿勾选初始化 README** 后执行）：
-
-```bash
-git remote add origin https://github.com/<你的用户名>/lingnan-curator.git
-git remote add gitee  https://gitee.com/<你的用户名>/lingnan-curator.git
-git push -u origin master
-git push -u gitee  master      # 国内访问建议同步镜像
-```
-
-日后如需归档本地权重库，改用 Git LFS 并留意 Gitee 免费 LFS 配额。
-
 ## 功能一览（Web 展馆）
 
 | 入口 | 说明 |
