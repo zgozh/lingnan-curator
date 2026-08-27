@@ -50,6 +50,10 @@ with open(META, encoding="utf-8-sig", newline="") as f:
         b = best_img(d)
         if not b:
             continue
+        # 滑块"上色前"图：本地有 restored 用之；克隆版(不含405MB restored)
+        # 自动回退到 data/raw 原始扫描件，浏览体验近似
+        raws = list((ROOT / "data/raw").glob(f"{pid}.*"))
+        raw_rel = f"data/raw/{raws[0].name}" if raws else ""
         story = ""
         try:
             sp = d / "story.json"
@@ -67,6 +71,7 @@ with open(META, encoding="utf-8-sig", newline="") as f:
             "src": r.get("source_url") or "",
             "best": b,
             "restored": (d / "restored.jpg").exists(),
+            "raw": raw_rel,
             "colorized": (d / "colorized.jpg").exists(),
             "audio": (d / "narration.wav").exists(),
             "postcard": (d / "postcard-front.png").exists(),
@@ -136,20 +141,26 @@ overflow:auto;padding:18px 22px;display:none;z-index:51;box-shadow:0 8px 40px #0
 const DATA = {config};
 function openDetail(pid){{
   const it = DATA.find(x => x.pid === pid);
-  const cmpLeft = it.restored ? 'restored.jpg' : it.best;
+  const cmpLeft = it.restored ? 'restored.jpg'
+                : (it.raw ? it.raw.replace(/^data\\/raw\\//, '') : '');
+  const cmpBase = it.restored
+    ? `data/processed/${{it.pid}}/` : 'data/raw/';
   const cmpRight = it.colorized ? 'colorized.jpg' : it.best;
   let cmp = '';
-  if (cmpLeft !== cmpRight) {{
+  if (cmpLeft && cmpLeft !== cmpRight) {{
     cmp = `<div class="cmp" id="cmp">
-      <img src="data/processed/${{it.pid}}/${{cmpLeft}}" alt="修复前">
-      <img class="b" id="layB" src="data/processed/${{it.pid}}/${{cmpRight}}" alt="上色后">
+      <img src="${{cmpBase}}${{cmpLeft}}" alt="上色前">
+      <img class="b" id="layB"
+           src="data/processed/${{it.pid}}/${{cmpRight}}" alt="上色后">
       </div>
       <input type="range" min="0" max="100" value="50"
         oninput="document.getElementById('layB').style.clipPath=
           'inset(0 '+(100-this.value)+'% 0 0)'">
-      <div class="lbl">左拖=修复灰度原图，右拉=AI 上色</div>`;
+      <div class="lbl">左拖=上色前，右拉=AI 上色
+        ${{it.restored ? '（修复灰度）' : '（原始扫描件）'}}</div>`;
   }} else {{
-    cmp = `<div class="cmp"><img src="data/processed/${{it.pid}}/${{it.best}}"></div>`;
+    cmp = `<div class="cmp"><img
+      src="data/processed/${{it.pid}}/${{it.best}}"></div>`;
   }}
   const audio = it.audio
     ? `<p><b>🎧 粤语讲解：</b><br><audio controls preload="none"
@@ -191,7 +202,7 @@ out = ROOT / "预览.html"
 out.write_text(html, encoding="utf-8")
 
 # 自校验：页面引用的所有真实资源路径必须存在（跳过 JS 模板占位符 ${...}）
-refs = [r_ for r_ in re.findall(r'(?:src|href)="(data/processed/[^"]+)"', html)
+refs = [r_ for r_ in re.findall(r'(?:src|href)="((?:data/(?:processed|raw))/[^"]+)"', html)
         if "${" not in r_]
 missing = [r_ for r_ in refs if not (ROOT / r_).exists()]
 assert not missing, f"预览页引用了不存在的文件: {missing[:3]}"

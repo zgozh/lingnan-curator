@@ -1,0 +1,56 @@
+{
+  "items": [
+    {
+      "step": "commons_old_woman_canton_kwangtung_province_chin_25997/restore",
+      "status": 1,
+      "detail": ""
+    },
+    {
+      "step": "commons_old_woman_canton_kwangtung_province_chin_25997/colorize",
+      "status": 1,
+      "detail": ""
+    },
+    {
+      "step": "commons_old_woman_canton_kwangtung_province_chin_25997/ocr",
+      "status": 1,
+      "detail": ""
+    },
+    {
+      "step": "commons_old_woman_canton_kwangtung_province_chin_25997/caption",
+      "status": 1,
+      "detail": "qwen-vl"
+    },
+    {
+      "step": "commons_old_woman_canton_kwangtung_province_chin_25997/store",
+      "status": 1,
+      "detail": ""
+    },
+    {
+      "step": "commons_old_woman_canton_kwangtung_province_chin_26000/restore",
+      "status": 1,
+      "detail": ""
+    },
+    {
+      "step": "commons_old_woman_canton_kwangtung_province_chin_26000/colorize",
+      "status": 1,
+      "detail": ""
+    },
+    {
+      "step": "commons_old_woman_canton_kwangtung_province_chin_26000/ocr",
+      "status": 1,
+      "detail": ""
+    },
+    {
+      "step": "commons_old_woman_canton_kwangtung_province_chin_26000/caption",
+      "status": 2,
+      "detail": "VLM 降级(fallback)"
+    },
+    {
+      "step": "commons_old_woman_canton_kwangtung_province_chin_26000/store",
+      "status": 1,
+      "detail": ""
+    }
+  ],
+  "started_at": "2026-08-27T10:20:01+00:00",
+  "finished_at": "2026-08-27T10:22:36+00:00"
+}

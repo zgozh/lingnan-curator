@@ -1,12 +1,7 @@
 # 密钥与环境
 .env
 
-# 数据与衍生资产（素材不入 git，版权与体积原因）
-data/raw/
-data/processed/
-data/tmp/
-
-# 模型权重
+# 模型权重（21.9GB 本机资产，绝不入库；接收者按 README 自动下载）
 models/
 *.ckpt
 *.safetensors
@@ -20,17 +15,53 @@ __pycache__/
 .pytest_cache/
 .pytest-tmp/
 .tmp/
-data/test-runs/
 .ruff_cache/
-
-# 评测产物（报告保留 JSON 结论时可手动放开）
-eval/reports/
-
-# 系统
-Thumbs.db
-.DS_Store
 
 # 会话/临时产物
 tmp/
 .superpowers/
 data/logs/
+data/test-runs/
+
+# 系统垃圾
+Thumbs.db
+.DS_Store
+
+# ---------------- 数据资产策略 ----------------
+# 原则：核心成果随库分发（全公版许可，见 meta.csv），
+# 重中间产物 / 实验存档只在 zip 发布包中，不入 git。
+
+# 1) 落选件（版权筛选剔除）不入库
+data/raw/_rejected/
+
+# 2) processed 整体忽略后精确放行浏览必需的产物
+data/processed/*
+!data/processed/*/
+!data/processed/*/colorized.jpg
+!data/processed/*/enhanced.jpg
+!data/processed/*/narration.wav
+!data/processed/*/narration.json
+!data/processed/*/story.json
+!data/processed/*/postcard-front.png
+!data/processed/*/postcard-back.png
+!data/processed/*/slogan.png
+!data/processed/titles-zh.json
+!data/processed/_report.json
+
+# 放行之外的重文件仍被忽略：
+#   restored.jpg(405MB 原分辨率)/repaired/refined/enhanced-v1 */
+#   compare*/ 实验目录 / enhanced-archive/ 候选存档 / tts-* 试听碎片
+# 浏览器滑块的"上色前"图由 data/raw 原始件替代（gen_preview 自动处理）
+data/processed/*/restored.jpg
+data/processed/*/repaired.jpg
+data/processed/*/refined.jpg
+data/processed/*/enhanced-v1*.jpg
+data/processed/*/.cand-in.jpg
+data/processed/*/.vendor-*
+data/processed/*/compare/
+data/processed/*/compare2/
+data/processed/*/compare3/
+data/processed/*/enhanced-archive/
+data/processed/*/tts-*.wav
+
+# 评测报告结论 JSON 小体积，随库可复现（不再忽略 eval/reports/）

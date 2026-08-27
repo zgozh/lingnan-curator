@@ -1,0 +1,11 @@
+{
+  "generated_at": "2026-08-25T16:18:46",
+  "total": 20,
+  "answered": 13,
+  "refusals": 7,
+  "refused_accuracy": 1.0,
+  "answer_rate": 0.6923076923076923,
+  "faithfulness": 0.9222222222222223,
+  "answer_relevancy": 0.861895006642181,
+  "meets_threshold": true
+}
