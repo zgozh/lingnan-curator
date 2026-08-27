@@ -93,17 +93,22 @@ copy .env.example .env
 # 3) 启动 Milvus（先打开 Docker Desktop）
 docker compose up -d milvus        # 健康检查：127.0.0.1:19530
 
-# 4) （可选）启动精排服务（不开则检索自动降级，仅标记 degraded）
-uv run uvicorn scripts.rerank_server:app --port 8303
+# 4) 【快速路线·推荐】一键灌入随库向量快照（0.9MB，30 秒，零 GPU/零 API 费用）
+uv run python -m app.cli load-snapshot
+#    → 检索/问答/策展立即可用！仅当想上传/抓取"新照片"时才需要第 5 步管线
 
-# 5) 入库（包内已带 data/raw 素材；重复执行幂等。首次约 30 分钟跑完全部 GPU 步骤）
+# 5) 【完整路线·可选】入库管线（重跑修复/上色/OCR/描述；需 GPU，幂等先删后插）
 uv run python -m app.cli ingest --src data/raw
+
+# 5b) （可选）启动精排服务提升检索精度（不开则自动降级 degraded）
+uv run uvicorn scripts.rerank_server:app --port 8303
 
 # 6) 起 Web 展馆，浏览器打开 http://127.0.0.1:8300
 uv run uvicorn app.web.main:app --port 8300
 ```
 
-> 模型权重说明：BGE-M3/CLIP/rerank 首次运行自动从 hf-mirror 下载到本地缓存（约 8GB）；CodeFormer/DDColor 权重已随包放 `models/` 下（若缺失见常见问题）。无 GPU 的机器无法完成第 5 步的本地推理链路。
+> 模型权重说明：走**快速路线**时不需要任何权重；仅完整路线需要 BGE-M3/CLIP/DDColor
+> （首次自动从 hf-mirror 下载约 8GB）。无 GPU 机器修复步骤自动跳过、嵌入走 CPU 较慢。
 
 ### 模式 C · 仅验证代码质量（无 GPU、无密钥也能跑）
 
@@ -187,6 +192,7 @@ uv run pytest tests -q      # 245 个单测（外部服务全 mock，无需任�
 - **GBK 控制台乱码**：PowerShell 先 `[Console]::OutputEncoding=utf8`
 - **Milvus 里已有旧数据会重复吗**：ingest 幂等（先删后插同 photo_id），重复执行安全
 - **全量重跑要花钱吗**：数据不会重复，但 OCR/VLM 描述步骤会重新调 API（26 张约 ¥1）；日常加新照片请用 `--pid` 增量而非全量重跑
+- **为什么不用重跑就有检索？** 随库附带 `data/snapshot/corpus.jsonl` 向量快照（导出/导入命令见 `export-snapshot` / `load-snapshot`），著录与三路向量直接复用作者已算好的结果；只有新增照片才需要跑管线
 
 ## 路线图
 

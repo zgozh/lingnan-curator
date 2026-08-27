@@ -327,6 +327,27 @@ def cmd_crawl(args) -> None:
           f"`uv run python -m app.cli ingest --pid {','.join(pids)}`")
 
 
+def cmd_export_snapshot(args) -> None:
+    """导出 Milvus 全量语料(含向量)为 JSONL 快照，随库分发免重跑管线。"""
+    from app.ingest.snapshot import export_default
+
+    n = export_default()
+    if n == 0:
+        print("[NG] 没有可导出的实体（Milvus 未连接或库为空）")
+        raise SystemExit(1)
+    print(f"[OK] 导出 {n} 条 → data/snapshot/corpus.jsonl")
+
+
+def cmd_load_snapshot(args) -> None:
+    """从快照灌库（先删后插幂等）：接收者跳过 GPU 管线 30 秒获得检索。"""
+    from app.ingest.snapshot import load_snapshot
+    from app.infra.milvus_store import get_client
+
+    added, skipped = load_snapshot(get_client(), Path(args.file))
+    print(f"[OK] 导入 {added} 条，跳过 {skipped} 条 → "
+          f"现在可以 `uv run uvicorn app.web.main:app --port 8300` 开馆")
+
+
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="lingnan", description="岭南非遗 AI 策展人")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -383,6 +404,16 @@ def main(argv: list[str] | None = None) -> None:
     cw.add_argument("--limit", type=int, default=10, help="最多抓取张数")
     cw.add_argument("--location", default="", help="meta 地点字段填充值")
     cw.set_defaults(func=cmd_crawl)
+
+    ex = sub.add_parser("export-snapshot",
+                        help="导出 Milvus 语料快照(含向量)为 JSONL")
+    ex.set_defaults(func=cmd_export_snapshot)
+
+    ld = sub.add_parser("load-snapshot",
+                        help="从快照一键灌库(无需 GPU/无需重跑管线)")
+    ld.add_argument("--file", default="data/snapshot/corpus.jsonl",
+                    help="快照 JSONL 路径")
+    ld.set_defaults(func=cmd_load_snapshot)
 
     for name in ("serve",):
         sp = sub.add_parser(name)
