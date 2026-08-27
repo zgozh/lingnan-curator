@@ -186,6 +186,7 @@ uv run pytest tests -q      # 245 个单测（外部服务全 mock，无需任�
 - **抓取报 403？** 项目内置合规 UA（Wikimedia 要求 UA 含项目描述+联系方式），若代理环境请确认 UA 头未被网关改写
 - **GBK 控制台乱码**：PowerShell 先 `[Console]::OutputEncoding=utf8`
 - **Milvus 里已有旧数据会重复吗**：ingest 幂等（先删后插同 photo_id），重复执行安全
+- **全量重跑要花钱吗**：数据不会重复，但 OCR/VLM 描述步骤会重新调 API（26 张约 ¥1）；日常加新照片请用 `--pid` 增量而非全量重跑
 
 ## 路线图
 
