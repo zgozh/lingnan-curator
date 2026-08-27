@@ -79,3 +79,34 @@ def test_stream_answer_yields_deltas_then_done(monkeypatch):
     assert got[0]["type"] == "delta"
     assert got[-1]["type"] == "done"
     assert got[-1]["photo_ids"] == ["sample_a"]
+
+
+def test_stream_uses_plain_text_prompt_not_json(monkeypatch):
+    """SSE 流给观众看的必须是自然语言：流式路径禁用 JSON 输出契约。"""
+    hits = [Hit("sample_a", "骑楼街景", "骑楼柱廊与人行道")]
+
+    def fake_stream(messages, settings=None, client_factory=None):
+        captured["system"] = messages[0]["content"]
+        yield "讲解文本"
+
+    captured = {}
+    monkeypatch.setattr(dc, "_search", lambda q, top_k=6: hits)
+    monkeypatch.setattr(dc.lc, "stream_chat", fake_stream)
+    list(dc.stream_answer("骑楼有什么特点？"))
+    sys_msg = captured["system"]
+    assert "纯文本" in sys_msg
+    assert '严格 JSON' not in sys_msg and '"answer"' not in sys_msg
+
+
+def test_stream_refusal_only_on_exact_sentinel(monkeypatch):
+    """正常答案里偶然出现引述词不应误判拒答；哨兵单独成句才判拒。"""
+    hits = [Hit("sample_a")]
+
+    def fake_stream(messages, settings=None, client_factory=None):
+        yield "这里没有牌匾记录，仅有此照片。"
+
+    monkeypatch.setattr(dc, "_search", lambda q, top_k=6: hits)
+    monkeypatch.setattr(dc.lc, "stream_chat", fake_stream)
+    events = {e["type"]: e for e in dc.stream_answer("问")}
+    assert events["done"]["refused"] is False
+    assert events["done"]["photo_ids"] == ["sample_a"]

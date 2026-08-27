@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}检索 · {{ q }}{% endblock %}
 {% block body %}
 <h1>混合检索结果{% if q %}：“{{ q }}”{% endif %}</h1>
@@ -11,7 +11,7 @@
 <div class="grid">
   {% for h in hits %}
   <a class="card" href="/photo/{{ h.photo_id }}">
-    <img src="{{ media_src(photo_id) }}"
+    <img src="{{ media_src(h.photo_id) }}"
          onerror="this.src='/static/placeholder.svg'" alt="{{ h.title }}">
     <div class="card-body">
       <strong>{{ zh_title(h.photo_id, h.title) }}</strong>

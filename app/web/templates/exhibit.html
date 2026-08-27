@@ -6,6 +6,11 @@
   <input name="theme" value="{{ result.theme }}" placeholder="输入主题，如：骑楼、粤剧、西关…">
   <button>开始策展</button>
 </form>
+<div class="chiprow">
+  {% for t in ['骑楼', '粤剧', '码头', '街市', '建筑'] %}
+  <a class="chip" href="/exhibit?theme={{ t }}">{{ t }}</a>
+  {% endfor %}
+</div>
 {% for sec in result.sections %}
 <section class="exhibit-sec">
   <h2>{{ loop.index }}. {{ sec.title }}</h2>

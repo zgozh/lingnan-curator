@@ -33,6 +33,16 @@ _SYSTEM = (
     "photo_ids 只能从证据列表中选择。使用简体中文。"
 )
 
+# 流式(SSE)路径专用：观众直接阅读 delta，必须是纯文本，绝不能吐 JSON。
+_SYSTEM_STREAM = (
+    "你是岭南老照片展馆的讲解员。依据【馆藏证据】用简体中文回答观众问题。输出要求：\n"
+    "- 纯文本讲解，2~4 句完整的话，禁止 JSON、键值对、列表符号或任何代码风格标记；\n"
+    "- 先直接回应问题，再补充画面细节与历史背景；\n"
+    "- 每个论断都须能在【馆藏证据】中找到依据，不引入证据之外的史实结论；\n"
+    "- 只要证据与问题有任何关联（哪怕是同一时代的街道/建筑/人群场景）就尽量作答；\n"
+    "- 仅当证据与问题完全无关时，整条回复只输出一行：EVIDENCE_NOT_ENOUGH\n"
+)
+
 
 def _search(question: str, top_k: int = 6):
     """seam：便于测试替换；真实实现走 F2 检索门面。"""
@@ -79,6 +89,12 @@ def ask(question: str, settings=None) -> dict[str, Any]:
     return {"answer": answer, "photo_ids": cited, "refused": False}
 
 
+def _stream_messages(question: str, hits) -> list[dict]:
+    """流式路径消息：与 _build_messages 同证据块，但系统提示为纯文本契约。"""
+    base = _build_messages(question, hits)
+    return [{"role": "system", "content": _SYSTEM_STREAM}] + base[1:]
+
+
 def stream_answer(question: str, settings=None):
     """SSE 友好输出：先 delta 流式正文，最后一条 done 带引用元数据。"""
     hits = _search(question)
@@ -90,7 +106,7 @@ def stream_answer(question: str, settings=None):
     valid_ids = [h.photo_id for h in hits]
     parts: list[str] = []
     try:
-        for delta in lc.stream_chat(_build_messages(question, hits),
+        for delta in lc.stream_chat(_stream_messages(question, hits),
                                     settings=settings):
             parts.append(delta)
             yield {"type": "delta", "text": delta}
@@ -98,6 +114,7 @@ def stream_answer(question: str, settings=None):
         logger.warning("docent 流式失败: %s", exc)
 
     full = "".join(parts)
-    refused = (not full or "EVIDENCE_NOT_ENOUGH" in full)
+    refused = (not full.strip() or "EVIDENCE_NOT_ENOUGH" in full
+               and len(full.strip()) < 60)
     yield {"type": "done", "refused": refused,
            "photo_ids": [] if refused else valid_ids}
