@@ -74,6 +74,62 @@ TEMPLATES.env.globals["media_exists"] = lambda pid, name: (
 TEMPLATES.env.globals["zh_title"] = lambda *a, **k: _zh_title(*a, **k)
 
 
+def _review_rows() -> list[dict]:
+    """比稿评审数据：每张照片的线上图 + 存档候选列表。Milvus 挂则空表。"""
+    try:
+        photos = _photos_all()
+    except Exception as exc:  # noqa: BLE001 —— 降级边界
+        logger.warning("评审页取著录失败: %s", exc)
+        return []
+    rows: list[dict] = []
+    zh = _titles_zh()
+    for p in photos:
+        pid = str(p.get("photo_id") or "")
+        if not pid or "/" in pid:
+            continue
+        d = Path("data/processed") / pid
+        arch = d / "enhanced-archive"
+        cands: list[dict] = []
+        if arch.is_dir():
+            for f in sorted(arch.iterdir()):
+                if f.is_file() and f.suffix.lower() in (".jpg", ".jpeg",
+                                                        ".png"):
+                    cands.append({"name": f.name,
+                                  "src": f"/media/{pid}/enhanced-archive/"
+                                         f"{f.name}"})
+        rows.append({
+            "photo_id": pid,
+            "zh_title": zh.get(pid) or p.get("title") or pid,
+            "live": _media_src(pid),
+            "has_live": (d / "enhanced.jpg").is_file(),
+            "colorized_src": "/media/" + pid + "/colorized.jpg"
+                             if (d / "colorized.jpg").is_file() else None,
+            "candidates": cands,
+            "prompt": (arch / f"tailored-{pid}.prompt.txt").read_text(
+                encoding="utf-8")[:120]
+            if (arch / f"tailored-{pid}.prompt.txt").is_file() else "",
+        })
+    return rows
+
+
+_ALLOWED_CAND = {".jpg", ".jpeg", ".png"}
+
+
+def _safe_archive_path(photo_id: str, file_name: str) -> Path | None:
+    """评审文件路径安全：pid 与文件名都必须是纯 basename 且扩展名白名单。"""
+    if not photo_id or not file_name:
+        return None
+    if "/" in photo_id or "\\" in photo_id or "." in photo_id:
+        return None                      # pid 不允许带点/斜杠
+    if "/" in file_name or "\\" in file_name or file_name.startswith("."):
+        return None
+    p = Path("data/processed") / photo_id / "enhanced-archive" / file_name
+    if p.suffix.lower() not in _ALLOWED_CAND or p.parent.name != \
+            "enhanced-archive":
+        return None
+    return p
+
+
 def _photos_all(settings=None) -> list[dict]:
     """seam：首页照片墙数据（Milvus 全量著录）。"""
     from app.infra.milvus_store import get_client
@@ -223,6 +279,49 @@ def create_app() -> FastAPI:
         return TEMPLATES.TemplateResponse(
             request, "exhibit.html", {"result": result},
         )
+
+    @app.get("/review")
+    def review_page(request: Request):
+        """比稿评审页：逐张对比并决定启用哪一版上色（人工否决权）。"""
+        return TEMPLATES.TemplateResponse(
+            request, "review.html", {"rows": _review_rows()},
+        )
+
+    @app.post("/api/review/{photo_id}/enable")
+    def review_enable(photo_id: str, body: dict):
+        file_name = body.get("file")
+        if not isinstance(file_name, str):
+            raise HTTPException(400, "缺少候选文件名")
+        cand = _safe_archive_path(photo_id, file_name)
+        if cand is None or not cand.is_file():
+            raise HTTPException(400, "非法或不存在候选文件")
+        d = Path("data/processed") / photo_id
+        live = d / "enhanced.jpg"
+        archive = d / "enhanced-archive"
+        import time as _t
+
+        if live.exists():                     # 旧线上图先挪入存档保留
+            stamp = _t.strftime("%Y%m%d-%H%M%S")
+            live.rename(archive / f"replaced-{stamp}-{file_name}")
+        cand.rename(live)                     # 移动语义：候选离场、转正上线
+        return {"ok": True, "live": f"/media/{photo_id}/enhanced.jpg"}
+
+    @app.post("/api/review/{photo_id}/withdraw")
+    def review_withdraw(photo_id: str, body: dict):
+        if (not photo_id or "/" in photo_id or "\\" in photo_id
+                or "." in photo_id):
+            raise HTTPException(400, "非法 photo_id")
+        d = Path("data/processed") / photo_id
+        live = d / "enhanced.jpg"
+        if not live.is_file():
+            raise HTTPException(404, "该照片当前没有启用增强图")
+        archive = d / "enhanced-archive"
+        import time as _t
+
+        stamp = _t.strftime("%Y%m%d-%H%M%S")
+        archive.mkdir(parents=True, exist_ok=True)
+        live.rename(archive / f"withdrawn-{stamp}-enhanced.jpg")
+        return {"ok": True}
 
     @app.post("/api/ask")
     async def api_ask(request: Request):

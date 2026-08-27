@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}比稿评审 · 湾区记忆{% endblock %}
+{% block body %}
+<h1>上色比稿评审</h1>
+<p class="hint">逐张对比后点「启用」把候选设为线上展示图；点「撤下」恢复原上色图。
+启用/撤下即时生效（无需重启服务）。</p>
+
+{% for row in rows %}
+<section class="review-card">
+  <h2>{{ row.zh_title }}
+    <span class="hint">（{{ row.photo_id }}{% if row.has_live %} · 当前已启用增强{% endif %}）</span>
+  </h2>
+  {% if row.prompt %}<p class="hint">定制提示词：{{ row.prompt }}…</p>{% endif %}
+  <div class="review-grid">
+    <figure>
+      <img src="{{ row.colorized_src or row.live }}" alt="原上色"
+           loading="lazy"
+           onerror="this.src='/static/placeholder.svg'">
+      <figcaption>原 DDColor 上色</figcaption>
+    </figure>
+    <figure>
+      <img src="{{ row.live }}" alt="当前线上" loading="lazy"
+           onerror="this.src='/static/placeholder.svg'">
+      <figcaption>当前线上展示</figcaption>
+    </figure>
+    {% for cand in row.candidates %}
+    <figure data-cand="{{ cand.name }}">
+      <img src="{{ cand.src }}" alt="{{ cand.name }}" loading="lazy">
+      <figcaption>{{ cand.name }}
+        <button class="chip review-enable" data-pid="{{ row.photo_id }}"
+                data-file="{{ cand.name }}">启用此版</button>
+      </figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+  {% if row.has_live %}
+  <button class="chip review-withdraw" data-pid="{{ row.photo_id }}">
+    撤下增强（回退原上色）</button>
+  {% endif %}
+</section>
+{% else %}
+<p class="empty">暂无馆藏数据。</p>
+{% endfor %}
+{% endblock %}
+{% block scripts %}<script src="/static/review.js" defer></script>{% endblock %}

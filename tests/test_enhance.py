@@ -85,3 +85,66 @@ def test_composite_helper_sizes_align():
     cloud = Image.new("RGB", (1392, 736), (200, 100, 50))
     out = _composite(ref, cloud)
     assert out.size == cloud.size
+
+
+# ---------- 定制提示词候选（比稿流） ----------
+
+import json as _json
+
+
+class FakeChatOK:
+    def __call__(self, messages, json_mode=False, temperature=None,
+                 model=None, settings=None):
+        return _json.dumps({"prompt": "按内容定制的自然色彩，避免泛黄"})
+
+
+class FakeChatBoom:
+    def __call__(self, *a, **k):
+        raise RuntimeError("llm down")
+
+
+ROW = {"title": "Godowns in Honam", "year": "1857",
+       "location": "广州", "caption": "河南岛货栈码头"}
+
+
+def test_build_candidate_writes_archive_and_prompt(demo_root, monkeypatch):
+    from app.ingest import enhance
+
+    fake = FakeColor()
+    ok = enhance.build_candidate(
+        "gz_demo", settings=None, row=ROW,
+        chat=FakeChatOK(), refine=fake)
+    assert ok
+    d = demo_root / "enhanced-archive"
+    assert (d / f"tailored-gz_demo.jpg").exists()
+    assert "泛黄" in (d / f"tailored-gz_demo.prompt.txt").read_text(
+        encoding="utf-8")
+    assert fake.calls == ["colorization"]     # 只走纯上色（保脸红线）
+
+
+def test_build_candidate_llm_failure_returns_false(demo_root):
+    from app.ingest import enhance
+
+    fake = FakeColor()
+    ok = enhance.build_candidate(
+        "gz_demo", settings=None, row=ROW,
+        chat=FakeChatBoom(), refine=fake)
+    assert not ok
+    assert fake.calls == []                   # 提示词失败不打云端
+    assert not (demo_root / "enhanced-archive").exists()
+
+
+def test_build_candidate_never_calls_description_edit(demo_root):
+    """红线：定制链任何情况下都不得调用修褶皱重绘。"""
+    from app.ingest import enhance
+
+    seen = []
+
+    class Spy(FakeColor):
+        def __call__(self, src, dst, function=None, **kw):
+            seen.append(function)
+            return super().__call__(src, dst, function=function, **kw)
+
+    enhance.build_candidate("gz_demo", settings=None, row=ROW,
+                            chat=FakeChatOK(), refine=Spy())
+    assert set(seen) <= {"colorization"}

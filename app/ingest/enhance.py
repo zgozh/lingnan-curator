@@ -24,6 +24,13 @@ COLOR_PROMPT = (
     "蓝天白云、深蓝或黑色西装、白色衬衫、草木绿色、建筑物呈现灰白原色；"
     "色调均衡不过度偏黄偏棕，不要做旧泛黄的怀旧滤镜，颜色自然鲜艳")
 
+PROMPT_SYSTEM = (
+    "你是老照片上色的色彩指导。给你一张历史照片的AI著录描述，"
+    "请输出一段中文上色提示词（80字内），只描述这张照片里该有的具体颜色："
+    "天空/水面/建筑材质/衣物/肤色的合理自然色调。"
+    "要求贴近史实、自然不鲜艳过度、明确避免整体泛黄泛棕。"
+    '输出严格 JSON：{"prompt": "..."}')
+
 
 def _composite(ref_rgb: Image.Image, cloud_rgb: Image.Image) -> Image.Image:
     """Y(结构/明暗)取 ref，CbCr(色彩)取 cloud。尺寸以 cloud 为准。"""
@@ -79,4 +86,81 @@ def build_enhanced(
         return True
     except Exception as exc:  # noqa: BLE001 —— 降级边界
         logger.warning("enhance 失败(%s): %s", photo_id, exc)
+        return False
+
+
+def tailor_prompt(row: dict, settings=None, chat=None) -> str:
+    """caption/年代/地点 → 该照片专属上色提示词；失败返回空串。"""
+    try:
+        if chat is None:
+            from app.infra import llm_client as lc
+
+            chat = lc.chat
+        s = settings or __import__("app.config",
+                                    fromlist=["Settings"]).Settings.load()
+        ctx = (f"标题：{row.get('title', '')}；年代：{row.get('year', '')}；"
+               f"地点：{row.get('location', '')}；描述：{row.get('caption', '')}")
+        raw = chat([{"role": "system", "content": PROMPT_SYSTEM},
+                    {"role": "user", "content": ctx}],
+                   json_mode=True, model=s.review_model, settings=s)
+        from app.utils.json_utils import extract_json
+
+        return str((extract_json(raw) or {}).get("prompt") or "").strip()
+    except Exception as exc:  # noqa: BLE001 —— 降级边界
+        logger.warning("tailor_prompt 失败: %s", exc)
+        return ""
+
+
+def build_candidate(
+    photo_id: str,
+    settings=None,
+    row: dict | None = None,
+    chat=None,
+    refine=None,
+    out_long_width: int = OUT_LONG_WIDTH,
+) -> bool:
+    """比稿候选：定制提示词 + E2 保脸链 → enhanced-archive/tailored-{pid}.jpg。
+
+    只落存档区待人工评审，绝不直接顶替线上展示。失败返回 False。
+    """
+    try:
+        root = Path("data/processed") / photo_id
+        src = root / "restored.jpg"
+        if not src.exists():
+            logger.warning("candidate 缺 restored.jpg: %s", photo_id)
+            return False
+        prompt = tailor_prompt(row or {}, settings=settings, chat=chat)
+        if not prompt:
+            return False
+        archive = root / "enhanced-archive"
+        with Image.open(src) as base:
+            ref_rgb = base.convert("RGB")
+        tmp_in = root / ".cand-in.jpg"
+        small = ref_rgb.copy()
+        small.thumbnail((IN_LONG_SIDE, IN_LONG_SIDE), Image.LANCZOS)
+        small.save(tmp_in, quality=92)
+
+        ok_color = refine(tmp_in, root / ".cand-color.png",
+                          function="colorization", prompt=prompt,
+                          settings=settings)
+        tmp_in.unlink(missing_ok=True)
+        if not ok_color:
+            return False
+        with Image.open(root / ".cand-color.png") as cloud:
+            cloud_rgb = cloud.convert("RGB")
+        comp = _composite(ref_rgb, cloud_rgb)
+        w, h = comp.size
+        tw = max(out_long_width, w)
+        im_out = comp.resize((tw, int(h * tw / w)), Image.LANCZOS)
+        im_out = im_out.filter(ImageFilter.UnsharpMask(
+            radius=2.2, percent=80, threshold=3))
+        archive.mkdir(parents=True, exist_ok=True)
+        dest = archive / f"tailored-{photo_id}.jpg"
+        im_out.save(dest, quality=93)
+        (archive / f"tailored-{photo_id}.prompt.txt").write_text(
+            prompt, encoding="utf-8")
+        (root / ".cand-color.png").unlink(missing_ok=True)
+        return True
+    except Exception as exc:  # noqa: BLE001 —— 降级边界
+        logger.warning("build_candidate 失败(%s): %s", photo_id, exc)
         return False

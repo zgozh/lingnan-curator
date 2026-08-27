@@ -64,3 +64,10 @@ pre.ocr { background:#fff; border:1px dashed var(--line); padding:14px;
   font-size: 13px; color: #7a7168; margin-top: 4px;
 }
 .artifact-poster { max-width: 420px; margin-top: 12px; }
+
+/* 比稿评审页 */
+.review-card { border-top: 1px solid #e4dcd0; padding: 18px 0; }
+.review-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 10px 0; }
+.review-grid figure { margin: 0; }
+.review-grid img { width: 100%; border: 1px solid #d8cfc2; border-radius: 6px; display: block; }
+.review-grid figcaption { font-size: 13px; color: #7a7168; margin-top: 4px; }

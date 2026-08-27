@@ -262,6 +262,41 @@ def cmd_enhance(args) -> None:
     print(f"完成 {ok_n}/{len(pids)}；详情页/文创自动优先用 enhanced.jpg")
 
 
+def cmd_tailor(args) -> None:
+    """比稿候选：定制提示词 + E2 保脸 → enhanced-archive/tailored-{pid}.jpg。"""
+    from pathlib import Path
+
+    from app.config import Settings
+    from app.infra.milvus_store import get_client
+    from app.ingest.enhance import build_candidate
+
+    s = Settings.load()
+    if args.pid:
+        pids = [args.pid]
+        rows = {args.pid: {}}
+    else:
+        rows = {str(r.get("photo_id")): r for r in get_client(s).query(
+            collection_name=s.collection, filter='photo_id != ""',
+            output_fields=["photo_id", "title", "year", "location",
+                           "caption"], limit=1000)}
+        pids = list(rows)
+    print(f"定制候选待生成 {len(pids)} 张（产物落 enhanced-archive/ 待人工评审）")
+    ok_n = 0
+    for i, b in enumerate(pids, start=1):
+        dest = (Path("data/processed") / b / "enhanced-archive" /
+                f"tailored-{b}.jpg")
+        if dest.exists() and not args.force:
+            print(f"[SKIP] ({i}/{len(pids)}) {b}: 候选已存在")
+            continue
+        t0 = __import__("time").time()
+        ok = build_candidate(b, settings=s, row=rows.get(b) or {})
+        ok_n += bool(ok)
+        tag = "OK" if ok else "NG"
+        print(f"[{tag}] ({i}/{len(pids)}) {b}: "
+              f"({__import__('time').time() - t0:.0f}s)", flush=True)
+    print(f"完成 {ok_n}/{len(pids)}；到 /review 页逐张评审启用")
+
+
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="lingnan", description="岭南非遗 AI 策展人")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -300,6 +335,13 @@ def main(argv: list[str] | None = None) -> None:
     en.add_argument("--all", action="store_true", help="全量馆藏(跳过已有)")
     en.add_argument("--force", action="store_true", help="重跑已有 enhanced")
     en.set_defaults(func=cmd_enhance)
+
+    tl = sub.add_parser("tailor",
+                        help="比稿候选：定制提示词+E2保脸→enhanced-archive(待评审)")
+    tl.add_argument("--pid", default="", help="单张 photo_id；与 --all 二选一")
+    tl.add_argument("--all", action="store_true", help="全量馆藏")
+    tl.add_argument("--force", action="store_true", help="重新生成已有候选")
+    tl.set_defaults(func=cmd_tailor)
 
     for name in ("serve",):
         sp = sub.add_parser(name)

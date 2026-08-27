@@ -212,6 +212,66 @@ def test_detail_slider_uses_enhanced_when_present(monkeypatch, tmp_path):
     assert "去褶皱" in body2
 
 
+# ---------- 比稿评审流 ----------
+
+def _make_review_fs(monkeypatch, tmp_path):
+    """构造一张照片 + 存档候选的文件系统。"""
+    import os
+
+    monkeypatch.chdir(tmp_path)
+    d = tmp_path / "data" / "processed" / "sample_a" / "enhanced-archive"
+    d.mkdir(parents=True)
+    (d / "tailored-sample_a.jpg").write_bytes(b"candidate")
+    (tmp_path / "data/processed/sample_a" / "colorized.jpg").write_bytes(b"c")
+    return d
+
+
+def test_review_page_lists_candidates(monkeypatch, tmp_path):
+    _make_review_fs(monkeypatch, tmp_path)
+    c = _client(monkeypatch)
+    r = c.get("/review")
+    assert r.status_code == 200
+    assert "/media/sample_a/enhanced-archive/tailored-sample_a.jpg" in r.text
+
+
+def test_review_enable_moves_candidate_online(monkeypatch, tmp_path):
+    d = _make_review_fs(monkeypatch, tmp_path)
+    c = _client(monkeypatch)
+    r = c.post("/api/review/sample_a/enable",
+               json={"file": "tailored-sample_a.jpg"})
+    assert r.status_code == 200
+    live = d.parent / "enhanced.jpg"
+    assert live.exists() and not (d / "tailored-sample_a.jpg").exists()
+    # 启用后 media_src 生效：再次 enable 应把旧的先挪去存档，不报错
+    (d / "tailored-b.jpg").write_bytes(b"x")
+    r2 = c.post("/api/review/sample_a/enable",
+                json={"file": "tailored-b.jpg"})
+    assert r2.status_code == 200
+    assert any(p.name.startswith("replaced-")
+               for p in d.iterdir())     # 旧线上图被挪入存档
+
+
+def test_review_withdraw_moves_back_to_archive(monkeypatch, tmp_path):
+    d = _make_review_fs(monkeypatch, tmp_path)
+    (d.parent / "enhanced.jpg").write_bytes(b"live")
+    c = _client(monkeypatch)
+    r = c.post("/api/review/sample_a/withdraw", json={})
+    assert r.status_code == 200
+    assert not (d.parent / "enhanced.jpg").exists()
+    assert any(p.name.startswith("withdrawn-") for p in d.iterdir())
+
+
+def test_review_enable_rejects_traversal_and_missing(monkeypatch, tmp_path):
+    d = _make_review_fs(monkeypatch, tmp_path)
+    c = _client(monkeypatch)
+    evil = ["../../etc/passwd", "sub/../tailored-x.jpg", ".hidden.jpg",
+            "nope.jpg", "", None]
+    for f in evil:
+        r = c.post("/api/review/sample_a/enable", json={"file": f})
+        assert r.status_code == 400, f
+    assert not (d.parent / "enhanced.jpg").exists()
+
+
 def test_detail_renders_story_and_narration(monkeypatch):
     """详情页应渲染缓存的故事文本 + 逐句旁白（含 emotion）。"""
     monkeypatch.setattr(wm, "_get_photo",
