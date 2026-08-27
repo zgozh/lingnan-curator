@@ -46,6 +46,41 @@ def _hit(photo_id: str, settings=None) -> _Hit | None:
         return None
 
 
+def _render_artifact(copy_type: str, pid: str, hit: "_Hit",
+                     body: str) -> dict[str, str] | None:
+    """把文案排版成实物图；任何失败返回 None（上层降级纯文本）。"""
+    try:
+        from pathlib import Path
+
+        from app.infra.artifact import (
+            pick_background, render_postcard, render_poster,
+        )
+
+        d = Path("data/processed") / pid
+        d.mkdir(parents=True, exist_ok=True)
+        bg = pick_background(d)
+        if copy_type == "postcard":
+            ok = render_postcard(
+                bg, hit.title or pid, hit.year or "", body,
+                f"馆藏编号 {pid} · 湾区记忆·岭南非遗 AI 策展人",
+                d / "postcard-front.png", d / "postcard-back.png")
+            if not ok:
+                return None
+            return {"front": f"/media/{pid}/postcard-front.png",
+                    "back": f"/media/{pid}/postcard-back.png"}
+        if copy_type == "slogan":
+            sub = " · ".join(x for x in (hit.year or "", hit.location or "")
+                             if x)
+            ok = render_poster(bg, body, sub, d / "slogan.png")
+            if not ok:
+                return None
+            return {"image": f"/media/{pid}/slogan.png"}
+        return None                      # moments 等纯文本形态不出图
+    except Exception as exc:  # noqa: BLE001 —— 降级边界
+        logger.warning("文创实物渲染异常，降级纯文本: %s", exc)
+        return None
+
+
 def create(photo_id: str, copy_type: str, settings=None) -> dict[str, Any]:
     if copy_type not in _TYPES:
         raise ValueError(f"不支持的文创类型: {copy_type}，"
@@ -66,6 +101,11 @@ def create(photo_id: str, copy_type: str, settings=None) -> dict[str, Any]:
                    {"role": "user", "content": f"【馆藏著录】{desc}"}],
                   json_mode=True, settings=settings)
     obj = extract_json(raw) or {}
-    return {"photo_id": photo_id, "type": copy_type,
-            "copy": {"title": str(obj.get("title") or "").strip(),
-                     "body": str(obj.get("body") or "").strip()}}
+    title = str(obj.get("title") or "").strip()
+    body = str(obj.get("body") or "").strip()
+    out: dict[str, Any] = {"photo_id": photo_id, "type": copy_type,
+                           "copy": {"title": title, "body": body}}
+    artifact = _render_artifact(copy_type, photo_id, hit, body or title)
+    if artifact:
+        out["artifact"] = artifact
+    return out

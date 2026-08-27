@@ -24,7 +24,22 @@ document.querySelectorAll('.chip').forEach((btn) => {
         return;
       }
       const data = await resp.json();
-      out.innerHTML = `<strong>${data.copy.title}</strong><br>${data.copy.body}`;
+      const c = data.copy || {};
+      let html = `<strong>${c.title}</strong><br>${c.body}`;
+      // 实物化产物：明信片双面 / 标语海报（渲染失败时 API 不带 artifact）
+      const a = data.artifact;
+      if (a && a.front && a.back) {
+        html += `<div class="artifact-grid">`
+          + `<figure><img src="${a.front}" alt="明信片正面">`
+          + `<figcaption>正面 · <a href="${a.front}" download>下载原图</a></figcaption></figure>`
+          + `<figure><img src="${a.back}" alt="明信片背面">`
+          + `<figcaption>背面 · <a href="${a.back}" download>下载原图</a></figcaption></figure>`
+          + `</div>`;
+      } else if (a && a.image) {
+        html += `<figure class="artifact-poster"><img src="${a.image}" alt="标语海报">`
+          + `<figcaption><a href="${a.image}" download>下载海报</a></figcaption></figure>`;
+      }
+      out.innerHTML = html;
     } catch {
       out.textContent = '网络异常，请重试。';
     }

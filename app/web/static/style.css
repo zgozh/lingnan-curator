@@ -52,3 +52,15 @@ pre.ocr { background:#fff; border:1px dashed var(--line); padding:14px;
 .chiprow { display:flex; gap:10px; }
 .foot { text-align:center; color:#a99f8a; font-size:13px; padding:26px;
   border-top:1px solid var(--line); }
+
+/* 文创实物化产物 */
+.artifact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 12px; }
+.artifact-grid figure, .artifact-poster { margin: 0; }
+.artifact-grid img, .artifact-poster img {
+  width: 100%; border: 1px solid #d8cfc2; border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(40, 30, 20, .15); display: block;
+}
+.artifact-grid figcaption, .artifact-poster figcaption {
+  font-size: 13px; color: #7a7168; margin-top: 4px;
+}
+.artifact-poster { max-width: 420px; margin-top: 12px; }
