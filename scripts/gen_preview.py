@@ -1,24 +1,26 @@
-"""生成零依赖离线画廊「预览.html」：发布包测试者双击即可浏览全部馆藏。
+"""生成零依赖离线展馆「预览.html」：发布包测试者双击即可浏览/对比/听讲。
 
 用法：uv run python scripts/gen_preview.py
-读取 data/raw/meta.csv 与 data/processed/<pid>/ 成果图，产出根目录 预览.html。
+- 卡片墙（26 张，enhanced 优先）
+- 点击卡片弹出离线详情：修复↔上色对比滑块、粤语口播 <audio>、故事文本、文创产物链接
+- 自校验：页面引用的每一条磁盘资源必须真实存在
 """
 import csv
 import json
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 META = ROOT / "data/raw/meta.csv"
 ZH = ROOT / "data/processed/titles-zh.json"
 
-# 必看推荐位（解说文案人工审定）
 PICKS = {
     "gz_file1919jpg_006": "修复上色全链样张：老照片里的省运会",
-    "gz_filegodownsinhonamjp_031": "沙面码头船居：唯一直用原版上色反成经典案例的照片",
-    "gz_filegsherwoodeddysun_048": "谢扶雅与孙中山：历史人物肖像的上色分寸感",
+    "gz_filegodownsinhonamjp_031": "沙面码头船居：唯一直用原版上色反成经典的照片",
+    "gz_filegsherwoodeddysun_048": "谢扶雅与孙中山：人物肖像上色的分寸感",
 }
 
-zh_map = {}
+zh_map: dict[str, str] = {}
 if ZH.exists():
     try:
         zh_map = json.loads(ZH.read_text(encoding="utf-8"))
@@ -26,53 +28,75 @@ if ZH.exists():
         pass
 
 
-def pick_img(pid_dir: Path) -> str | None:
-    for name in ("enhanced.jpg", "colorized.jpg", "restored.jpg"):
-        if (pid_dir / name).exists():
-            return name
-    return None
-
-
-def esc(s: str) -> str:
+def esc(s) -> str:
     return (s or "").replace("&", "&amp;").replace("<", "&lt;") \
         .replace('"', "&quot;")
 
 
-def card(pid: str, row: dict, best: str, rel: str) -> str:
-    zh = esc(zh_map.get(pid) or row.get("title") or pid)
-    loc = esc(row.get("location") or "")
-    year = esc(row.get("year") or "")
-    lic = esc(row.get("license") or "")
-    return (
-        f'<a class="card" target="_blank" '
-        f'href="{rel}/{pid}/{best}">'
-        f'<img loading="lazy" src="{rel}/{pid}/{best}" alt="{zh}">'
-        f"<div><strong>{zh}</strong>"
-        f"<small>{year or '年代不详'} · {loc or '地点不详'} · {lic}</small></div></a>")
+def best_img(d: Path) -> str | None:
+    for n in ("enhanced.jpg", "colorized.jpg", "restored.jpg"):
+        if (d / n).exists():
+            return n
+    return None
 
 
-rows: list[tuple[str, dict, str]] = []
+rows = []
 with open(META, encoding="utf-8-sig", newline="") as f:
     for r in csv.DictReader(f):
         pid = (r.get("photo_id") or "").strip()
         d = ROOT / f"data/processed/{pid}"
         if not pid or not d.exists():
             continue
-        best = pick_img(d)
-        if best:
-            rows.append((pid, r, best))
+        b = best_img(d)
+        if not b:
+            continue
+        story = ""
+        try:
+            sp = d / "story.json"
+            if sp.exists():
+                story = json.loads(
+                    sp.read_text(encoding="utf-8")).get("text", "")[:160]
+        except Exception:  # noqa: BLE001
+            pass
+        rows.append({
+            "pid": pid,
+            "zh": zh_map.get(pid) or r.get("title") or pid,
+            "year": (r.get("year") or "年代不详").strip(),
+            "loc": (r.get("location") or "地点不详").strip(),
+            "lic": (r.get("license") or "").strip(),
+            "src": r.get("source_url") or "",
+            "best": b,
+            "restored": (d / "restored.jpg").exists(),
+            "colorized": (d / "colorized.jpg").exists(),
+            "audio": (d / "narration.wav").exists(),
+            "postcard": (d / "postcard-front.png").exists(),
+            "postcard_back": (d / "postcard-back.png").exists(),
+            "slogan": (d / "slogan.png").exists(),
+            "story": story,
+        })
 
-pick_html = "".join(
-    card(p, r, b, "data/processed")
-    for p, r, b in rows if p in PICKS)
-grid_html = "".join(card(p, r, b, "data/processed") for p, r, b in rows)
+config = json.dumps(rows, ensure_ascii=False)
+
+
+def card(it: dict) -> str:
+    return (
+        f'<a class="card" href="#" data-pid="{esc(it["pid"])}" '
+        f'onclick="openDetail(this.dataset.pid);return false;">'
+        f'<img loading="lazy" src="data/processed/{it["pid"]}/{it["best"]}" '
+        f'alt="{esc(it["zh"])}">'
+        f"<div><strong>{esc(it['zh'])}</strong>"
+        f"<small>{esc(it['year'])} · {esc(it['loc'])} · {esc(it['lic'])}"
+        f"{' · 🎧有讲解' if it['audio'] else ''}</small></div></a>")
+
+
+pick_html = "".join(card(r) for r in rows if r["pid"] in PICKS)
+grid_html = "".join(card(r) for r in rows)
 
 html = f"""<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
+<html lang="zh-CN"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>湾区记忆 · 离线预览画廊</title>
+<title>湾区记忆 · 离线展馆</title>
 <style>
 body{{font-family:"Microsoft YaHei",sans-serif;background:#f7f2e9;margin:0;
 padding:32px;max-width:1280px;margin-inline:auto}}
@@ -88,39 +112,91 @@ border-radius:8px;overflow:hidden;border:1px solid #e4dcd0}}
 .card div{{padding:8px 10px;font-size:12px;line-height:1.5}}
 .card small{{color:#8a8177;display:block;margin-top:2px}}
 .picks .card{{border-color:#c9a36a}}
-</style>
-</head>
-<body>
-<h1>🏛️ 湾区记忆 · 离线预览画廊（{len(rows)} 张馆藏）</h1>
-<p class="note">这是随项目分发的<b>零依赖浏览页</b>：直接双击本文件即可，
-无需安装 Python/Milvus。点击任意卡片查看大图。
-想体验检索问答/文创生成等完整功能，见同目录 <b>START-HERE.md</b> 的模式 B。
-每张图的原始出处与许可协议见 <b>data/raw/meta.csv</b>。</p>
+#mask{{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;z-index:50}}
+#modal{{position:fixed;inset:5% 3%;background:#fffaf1;border-radius:10px;
+overflow:auto;padding:18px 22px;display:none;z-index:51;box-shadow:0 8px 40px #0007}}
+.cmp{{position:relative;width:min(680px,100%);margin:12px auto}}
+.cmp img{{width:100%;display:block}}
+.cmp .b{{position:absolute;inset:0;clip-path:inset(0 50% 0 0)}}
+.cmp input[type=range]{{width:min(680px,100%);display:block;margin:6px auto}}
+.lbl{{text-align:center;font-size:12px;color:#8a8177}}
+.meta{{font-size:13px;line-height:1.9;color:#444}}
+.linkout{{font-size:12px;margin-right:10px}}
+</style></head><body>
+<h1>🏛️ 湾区记忆 · 离线展馆（{len(rows)} 张馆藏）</h1>
+<p class="note">零依赖浏览页：双击本文件即可<b>点卡片 → 拉滑块对比 → 听粤语讲解</b>，
+无需安装任何环境。每张图的出处与许可见 <b>data/raw/meta.csv</b>；
+完整交互（检索/问答/文创生成）按 START-HERE.md 的模式 B 部署。</p>
+<h2>⭐ 先看这三张</h2><div class="grid picks">{pick_html}</div>
+<h2>全部馆藏</h2><div class="grid">{grid_html}</div>
 
-<h2>⭐ 先看这三张（各有代表性）</h2>
-<div class="grid picks">{pick_html}</div>
-
-<h2>全部馆藏（{len(rows)} 张）</h2>
-<div class="grid">{grid_html}</div>
-
-<h2>还可以看看</h2>
-<p style="font-size:13px;line-height:2">
-🎧 粤语口播：<code>data/processed/&lt;id&gt;/narration.wav</code>（任意播放器可放）
-<br>📮 文创明信片：<code>data/processed/&lt;id&gt;/postcard-front.png / postcard-back.png</code>
-<br>🧪 RAGAS 评测报告：<code>eval/reports/</code>（faithfulness 0.888 / relevancy 0.858 / 拒答准确率 1.0）
-<br>📖 完整设计文档：<code>docs/superpowers/specs/</code> · 决策记录 <code>docs/adr/</code>
-<br>🔧 本页由 <code>scripts/gen_preview.py</code> 生成（素材更新后重跑一次即可刷新）</p>
-</body>
-</html>
+<div id="mask" onclick="closeDetail()"></div>
+<div id="modal"></div>
+<script>
+const DATA = {config};
+function openDetail(pid){{
+  const it = DATA.find(x => x.pid === pid);
+  const cmpLeft = it.restored ? 'restored.jpg' : it.best;
+  const cmpRight = it.colorized ? 'colorized.jpg' : it.best;
+  let cmp = '';
+  if (cmpLeft !== cmpRight) {{
+    cmp = `<div class="cmp" id="cmp">
+      <img src="data/processed/${{it.pid}}/${{cmpLeft}}" alt="修复前">
+      <img class="b" id="layB" src="data/processed/${{it.pid}}/${{cmpRight}}" alt="上色后">
+      </div>
+      <input type="range" min="0" max="100" value="50"
+        oninput="document.getElementById('layB').style.clipPath=
+          'inset(0 '+(100-this.value)+'% 0 0)'">
+      <div class="lbl">左拖=修复灰度原图，右拉=AI 上色</div>`;
+  }} else {{
+    cmp = `<div class="cmp"><img src="data/processed/${{it.pid}}/${{it.best}}"></div>`;
+  }}
+  const audio = it.audio
+    ? `<p><b>🎧 粤语讲解：</b><br><audio controls preload="none"
+         style="width:min(680px,100%)"
+         src="data/processed/${{it.pid}}/narration.wav"></audio></p>`
+    : '<p class="lbl">该照片未收录预生成口播。</p>';
+  const links = [
+    ['明信片正面', it.postcard],
+    ['明信片背面', it.postcard_back],
+    ['海报图', it.slogan]].filter(x => x[1])
+    .map(([t, f]) =>
+      `<a class="linkout" target="_blank"
+         href="data/processed/${{it.pid}}/${{
+           t === '明信片正面' ? 'postcard-front.png'
+           : t === '明信片背面' ? 'postcard-back.png' : 'slogan.png'}}">${{t}}</a>`)
+    .join('');
+  document.getElementById('modal').innerHTML =
+    `<h2 style="border:0;margin-top:0">${{esc(it.zh)}}
+       <a href="#" onclick="closeDetail();return false;"
+          style="float:right;font-size:13px">✕ 关闭</a></h2>
+     ${{cmp}}${{audio}}
+     <p class="meta">🗓 ${{esc(it.year)}} · 📍${{esc(it.loc)}} · ⚖️${{esc(it.lic)}}
+       ${{it.src ? `· <a target="_blank" href="${{esc(it.src)}}">原始出处</a>` : ''}}</p>
+     ${{it.story ? `<p class="meta"><b>AI 叙事：</b>${{esc(it.story)}}…</p>` : ''}}
+     ${{links ? `<p>${{links}}</p>` : ''}}`;
+  document.getElementById('mask').style.display = 'block';
+  document.getElementById('modal').style.display = 'block';
+}}
+function closeDetail(){{
+  document.getElementById('mask').style.display = 'none';
+  document.getElementById('modal').style.display = 'none';
+}}
+function esc(s){{return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+}}
+</script>
+</body></html>
 """
 out = ROOT / "预览.html"
 out.write_text(html, encoding="utf-8")
 
-# 自校验：页面里引用的每张图必须真实存在于磁盘（file:// 相对路径可用）
-import re
-
-refs = re.findall(r'(?:src|href)="(data/processed/[^"]+)"', html)
+# 自校验：页面引用的所有真实资源路径必须存在（跳过 JS 模板占位符 ${...}）
+refs = [r_ for r_ in re.findall(r'(?:src|href)="(data/processed/[^"]+)"', html)
+        if "${" not in r_]
 missing = [r_ for r_ in refs if not (ROOT / r_).exists()]
-assert not missing, f"预览页引用了 {len(missing)} 个不存在的文件: {missing[:3]}"
-print(f"[OK] 预览.html 已生成：{len(rows)} 张卡片（必看 {sum(1 for p, _, _ in rows if p in PICKS)} 张）；"
-      f"引用资源 {len(refs)} 条全部存在")
+assert not missing, f"预览页引用了不存在的文件: {missing[:3]}"
+for it in rows:
+    assert (ROOT / f"data/processed/{it['pid']}/{it['best']}").exists()
+print(f"[OK] 预览.html 已生成：{len(rows)} 张卡片"
+      f"（必看 {sum(1 for r in rows if r['pid'] in PICKS)} 张）；"
+      f"资源引用 {len(refs)} 条全部存在")
