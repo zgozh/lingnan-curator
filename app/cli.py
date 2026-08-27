@@ -230,13 +230,36 @@ def cmd_refine(args) -> None:
 
 
 def cmd_enhance(args) -> None:
-    """画质增强云链：修褶皱→自然色→回贴锐化，产出 enhanced.jpg 副产物。"""
+    """画质增强云链：纯上色+亮度合成(保脸)→enhanced.jpg 副产物。"""
+    from pathlib import Path
+
+    from app.config import Settings
     from app.ingest.enhance import build_enhanced
 
-    t0 = __import__("time").time()
-    ok = build_enhanced(args.pid)
-    tag = "OK" if ok else "NG(已降级,沿用原产物)"
-    print(f"[{tag}] {args.pid}: enhanced.jpg ({__import__('time').time() - t0:.0f}s)")
+    if args.pid:
+        pids = [args.pid]
+    else:                                # --all：跳过已有 enhanced 的
+        from app.infra.milvus_store import get_client
+
+        s = Settings.load()
+        rows = get_client(s).query(
+            collection_name=s.collection, filter='photo_id != ""',
+            output_fields=["photo_id"], limit=1000)
+        pids = [str(r.get("photo_id")) for r in rows]
+        if not args.force:
+            pids = [p for p in pids
+                    if not (Path("data/processed") / p /
+                            "enhanced.jpg").exists()]
+    print(f"E2 增强链待处理 {len(pids)} 张（--force 重跑已有）")
+    ok_n = 0
+    for i, b in enumerate(pids, start=1):
+        t0 = __import__("time").time()
+        ok = build_enhanced(b)
+        ok_n += bool(ok)
+        tag = "OK" if ok else "NG(降级沿用原产物)"
+        print(f"[{tag}] ({i}/{len(pids)}) {b}: "
+              f"({__import__('time').time() - t0:.0f}s)", flush=True)
+    print(f"完成 {ok_n}/{len(pids)}；详情页/文创自动优先用 enhanced.jpg")
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -272,8 +295,10 @@ def main(argv: list[str] | None = None) -> None:
     rf.set_defaults(func=cmd_refine)
 
     en = sub.add_parser("enhance",
-                        help="画质增强云链：修褶皱+自然色→enhanced.jpg(不覆盖原图)")
-    en.add_argument("--pid", required=True, help="photo_id")
+                        help="画质增强链(E2保脸)：纯上色+亮度合成→enhanced.jpg")
+    en.add_argument("--pid", default="", help="单张 photo_id；与 --all 二选一")
+    en.add_argument("--all", action="store_true", help="全量馆藏(跳过已有)")
+    en.add_argument("--force", action="store_true", help="重跑已有 enhanced")
     en.set_defaults(func=cmd_enhance)
 
     for name in ("serve",):
